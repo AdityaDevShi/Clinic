@@ -1,10 +1,94 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, User, ChevronDown } from 'lucide-react';
+import { Menu, X, User, ChevronDown, Power } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { doc, onSnapshot, updateDoc, serverTimestamp, getDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { differenceInMinutes } from 'date-fns';
+
+function TherapistStatusToggle({ userId }: { userId: string }) {
+    const [isOnline, setIsOnline] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userId) return;
+        const unsub = onSnapshot(doc(db, 'therapists', userId), (doc) => {
+            if (doc.exists()) {
+                setIsOnline(doc.data().isOnline || false);
+            }
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [userId]);
+
+    const toggleStatus = async () => {
+        if (loading) return;
+
+        try {
+            const therapistRef = doc(db, 'therapists', userId);
+            const newState = !isOnline;
+
+            if (newState) {
+                // Going Online
+                await updateDoc(therapistRef, {
+                    isOnline: true,
+                    lastOnline: serverTimestamp(),
+                    currentSessionStart: serverTimestamp()
+                });
+            } else {
+                // Going Offline - Log Work!
+                // We need to fetch the doc carefully to get the currentSessionStart
+                const currentDoc = await getDoc(therapistRef);
+                const data = currentDoc.data();
+                const sessionStart = data?.currentSessionStart;
+
+                if (sessionStart) {
+                    const startTime = sessionStart.toDate();
+                    const endTime = new Date();
+                    const duration = differenceInMinutes(endTime, startTime);
+
+                    if (duration > 0) {
+                        await addDoc(collection(db, 'work_logs'), {
+                            therapistId: userId,
+                            startTime: sessionStart,
+                            endTime: Timestamp.fromDate(endTime),
+                            durationMinutes: duration,
+                            createdAt: serverTimestamp()
+                        });
+                    }
+                }
+
+                await updateDoc(therapistRef, {
+                    isOnline: false,
+                    lastOnline: serverTimestamp(),
+                    currentSessionStart: null
+                });
+            }
+        } catch (error) {
+            console.error("Error toggling status:", error);
+            alert("Failed to update status");
+        }
+    };
+
+    if (loading) return <div className="w-24 h-8 bg-gray-100 rounded-full animate-pulse" />;
+
+    return (
+        <button
+            onClick={toggleStatus}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${isOnline
+                ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                }`}
+        >
+            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+            {isOnline ? 'Online' : 'Offline'}
+        </button>
+    );
+}
+
 
 const navLinks = [
     { href: '/', label: 'Home' },
@@ -82,48 +166,53 @@ export default function Header() {
                         {loading ? (
                             <div className="w-8 h-8 rounded-full bg-[var(--neutral-200)] animate-pulse" />
                         ) : user ? (
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-[var(--warm-100)] transition-colors"
-                                >
-                                    <div className="w-8 h-8 rounded-full bg-[var(--primary-100)] flex items-center justify-center">
-                                        <User className="w-4 h-4 text-[var(--primary-600)]" />
-                                    </div>
-                                    <span className="text-sm font-medium text-[var(--neutral-700)]">
-                                        {user.name || 'User'}
-                                    </span>
-                                    <ChevronDown className="w-4 h-4 text-[var(--neutral-500)]" />
-                                </button>
+                            <div className="flex items-center gap-4">
+                                {user.role === 'therapist' && (
+                                    <TherapistStatusToggle userId={user.id} />
+                                )}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                        className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-[var(--warm-100)] transition-colors"
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-[var(--primary-100)] flex items-center justify-center">
+                                            <User className="w-4 h-4 text-[var(--primary-600)]" />
+                                        </div>
+                                        <span className="text-sm font-medium text-[var(--neutral-700)]">
+                                            {user.name || 'User'}
+                                        </span>
+                                        <ChevronDown className="w-4 h-4 text-[var(--neutral-500)]" />
+                                    </button>
 
-                                <AnimatePresence>
-                                    {isDropdownOpen && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 8 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 8 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2"
-                                        >
-                                            <Link
-                                                href={getDashboardLink()}
-                                                className="block px-4 py-2 text-sm text-[var(--neutral-700)] hover:bg-[var(--warm-50)]"
-                                                onClick={() => setIsDropdownOpen(false)}
+                                    <AnimatePresence>
+                                        {isDropdownOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 8 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2"
                                             >
-                                                Dashboard
-                                            </Link>
-                                            <button
-                                                onClick={() => {
-                                                    logout();
-                                                    setIsDropdownOpen(false);
-                                                }}
-                                                className="w-full text-left px-4 py-2 text-sm text-[var(--neutral-700)] hover:bg-[var(--warm-50)]"
-                                            >
-                                                Sign Out
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                                <Link
+                                                    href={getDashboardLink()}
+                                                    className="block px-4 py-2 text-sm text-[var(--neutral-700)] hover:bg-[var(--warm-50)]"
+                                                    onClick={() => setIsDropdownOpen(false)}
+                                                >
+                                                    Dashboard
+                                                </Link>
+                                                <button
+                                                    onClick={() => {
+                                                        logout();
+                                                        setIsDropdownOpen(false);
+                                                    }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-[var(--neutral-700)] hover:bg-[var(--warm-50)]"
+                                                >
+                                                    Sign Out
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             </div>
                         ) : (
                             <>

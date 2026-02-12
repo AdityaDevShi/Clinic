@@ -224,6 +224,166 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* When Should You See a Clinical Psychologist? Section - Placed after About Us */}
+      <section className="py-16 md:py-24 bg-white relative overflow-hidden">
+        {/* Decorative background element */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--primary-50)] rounded-full -translate-y-1/2 translate-x-1/2 opacity-50" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={staggerContainer}
+            className="text-center mb-16"
+          >
+            <motion.h2
+              variants={fadeInUp}
+              className="font-serif text-3xl md:text-4xl text-[var(--primary-700)] mb-6 leading-tight"
+            >
+              When Should You See a <br className="hidden md:block" /> Clinical Psychologist?
+            </motion.h2>
+            <motion.div variants={fadeInUp} className="section-divider mb-8" />
+            <motion.p
+              variants={fadeInUp}
+              className="text-lg text-[var(--neutral-600)] max-w-3xl mx-auto"
+            >
+              Clinical psychologists can help manage emotional, behavioral, and cognitive difficulties.
+              Seeking professional support is a sign of strength, not weakness.
+            </motion.p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+            {/* Emotional and Behavioral Signs */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={fadeInUp}
+              className="bg-[var(--warm-50)] rounded-2xl p-8 hover:shadow-md transition-shadow duration-300"
+            >
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mr-4">
+                  <Heart className="w-6 h-6 text-rose-600" />
+                </div>
+                <h3 className="font-serif text-xl font-bold text-[var(--primary-800)]">
+                  Emotional & Behavioral
+                </h3>
+              </div>
+              <ul className="space-y-3 pl-2">
+                {[
+                  'Feeling persistently sad, anxious, or irritable',
+                  'Having panic attacks, excessive fears, or phobias',
+                  'Struggling with obsessive thoughts or repeated behaviors',
+                  'Sudden changes in mood or personality',
+                  'Feeling overwhelmed, stressed, or burnt out',
+                  'Unexplained physical symptoms (psychosomatic)'
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start text-[var(--neutral-700)]">
+                    <span className="w-1.5 h-1.5 bg-rose-400 rounded-full mt-2.5 mr-3 flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            {/* Cognitive and Thinking Difficulties */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={fadeInUp}
+              className="bg-[var(--warm-50)] rounded-2xl p-8 hover:shadow-md transition-shadow duration-300"
+            >
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                  <User className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="font-serif text-xl font-bold text-[var(--primary-800)]">
+                  Cognitive & Thinking
+                </h3>
+              </div>
+              <ul className="space-y-3 pl-2">
+                {[
+                  'Trouble remembering things or staying focused',
+                  'Difficulty concentrating or completing tasks (ADHD)',
+                  'Confusion, difficulty finding words, or disorientation',
+                  'Decline in school or work performance',
+                  'Thinking/planning struggles after stroke or brain injury'
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start text-[var(--neutral-700)]">
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2.5 mr-3 flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            {/* Developmental and Social Concerns */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={fadeInUp}
+              className="bg-[var(--warm-50)] rounded-2xl p-8 hover:shadow-md transition-shadow duration-300"
+            >
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                  <Leaf className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="font-serif text-xl font-bold text-[var(--primary-800)]">
+                  Developmental (Child/Teen)
+                </h3>
+              </div>
+              <ul className="space-y-3 pl-2">
+                {[
+                  'Signs of autism or social interaction challenges',
+                  'Learning difficulties in reading, writing, or math',
+                  'Withdrawing from friends, family, or school',
+                  'Trouble adjusting to env/routine changes'
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start text-[var(--neutral-700)]">
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full mt-2.5 mr-3 flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+
+            {/* Life and Relationship Challenges */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={fadeInUp}
+              className="bg-[var(--warm-50)] rounded-2xl p-8 hover:shadow-md transition-shadow duration-300"
+            >
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mr-4">
+                  <Users className="w-6 h-6 text-amber-600" />
+                </div>
+                <h3 className="font-serif text-xl font-bold text-[var(--primary-800)]">
+                  Life & Relationships
+                </h3>
+              </div>
+              <ul className="space-y-3 pl-2">
+                {[
+                  'Coping with grief, separation, or major changes',
+                  'Marital or relationship issues',
+                  'Difficulty managing emotions in relationships',
+                  'Feeling lost, unmotivated, or unsure of direction'
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start text-[var(--neutral-700)]">
+                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-2.5 mr-3 flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Why Choose Us Section */}
       <section className="py-16 md:py-24 gradient-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -302,20 +462,20 @@ export default function HomePage() {
             >
               <motion.a
                 variants={fadeInUp}
-                href="tel:+919876543210"
+                href="tel:+917075829856"
                 className="flex items-center space-x-2 text-[var(--neutral-600)] hover:text-[var(--primary-600)] transition-colors"
               >
                 <Phone className="w-5 h-5 text-[var(--primary-500)]" />
-                <span>+91 98765 43210</span>
+                <span>+91 7075829856</span>
               </motion.a>
 
               <motion.a
                 variants={fadeInUp}
-                href="mailto:info@arambhmentalhealth.com"
+                href="mailto:care@arambh.net"
                 className="flex items-center space-x-2 text-[var(--neutral-600)] hover:text-[var(--primary-600)] transition-colors"
               >
                 <Mail className="w-5 h-5 text-[var(--primary-500)]" />
-                <span>info@arambhmentalhealth.com</span>
+                <span>care@arambh.net</span>
               </motion.a>
 
               <motion.div

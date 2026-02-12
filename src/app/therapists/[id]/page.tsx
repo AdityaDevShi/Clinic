@@ -9,7 +9,7 @@ import Footer from '@/components/layout/Footer';
 import TimeSlotPicker from '@/components/scheduling/TimeSlotPicker';
 import { getDefaultAvailability, formatTimeSlot, getDayName } from '@/lib/scheduling/availability';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Therapist, Availability, BusySlot, Booking, TimeSlot, Feedback } from '@/types';
 import {
@@ -127,80 +127,94 @@ export default function TherapistProfilePage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        async function fetchData() {
+        let unsubscribeTherapist: () => void;
+
+        // Fetch auxiliary data (availability, bookings, reviews)
+        async function fetchAuxData() {
             try {
-                // Try to fetch from Firebase
-                const therapistDoc = await getDoc(doc(db, 'therapists', therapistId));
+                // Fetch availability
+                const availabilityQuery = query(
+                    collection(db, 'availability'),
+                    where('therapistId', '==', therapistId)
+                );
+                const availabilityDocs = await getDocs(availabilityQuery);
 
-                if (therapistDoc.exists()) {
-                    const data = therapistDoc.data();
-                    setTherapist({
-                        id: therapistDoc.id,
-                        ...data,
-                        lastOnline: data.lastOnline?.toDate() || new Date(),
-                    } as Therapist);
-
-                    // Fetch availability
-                    const availabilityQuery = query(
-                        collection(db, 'availability'),
-                        where('therapistId', '==', therapistId)
-                    );
-                    const availabilityDocs = await getDocs(availabilityQuery);
-
-                    if (availabilityDocs.empty) {
-                        setAvailability(getDefaultAvailability(therapistId));
-                    } else {
-                        setAvailability(availabilityDocs.docs.map(d => ({ id: d.id, ...d.data() })) as Availability[]);
-                    }
-
-                    // Fetch bookings for this therapist
-                    const bookingsQuery = query(
-                        collection(db, 'bookings'),
-                        where('therapistId', '==', therapistId)
-                    );
-                    const bookingsDocs = await getDocs(bookingsQuery);
-                    setExistingBookings(bookingsDocs.docs.map(d => ({
-                        id: d.id,
-                        ...d.data(),
-                        sessionTime: d.data().sessionTime?.toDate() || new Date(),
-                        createdAt: d.data().createdAt?.toDate() || new Date(),
-                    })) as Booking[]);
-
-                    // Fetch reviews
-                    const reviewsQuery = query(
-                        collection(db, 'feedback'),
-                        where('therapistId', '==', therapistId),
-                        where('isPublic', '==', true)
-                    );
-                    const reviewsDocs = await getDocs(reviewsQuery);
-                    setReviews(reviewsDocs.docs.map(d => ({
-                        id: d.id,
-                        ...d.data(),
-                        createdAt: d.data().createdAt?.toDate() || new Date(),
-                    })) as Feedback[]);
-                } else {
-                    // Use demo data
-                    const demo = demoTherapists[therapistId];
-                    if (demo) {
-                        setTherapist(demo);
-                        setAvailability(getDefaultAvailability(therapistId));
-                        setReviews(demoReviews.filter(r => r.therapistId === therapistId));
-                    }
-                }
-            } catch (error) {
-                console.log('Using demo data:', error);
-                const demo = demoTherapists[therapistId];
-                if (demo) {
-                    setTherapist(demo);
+                if (availabilityDocs.empty) {
                     setAvailability(getDefaultAvailability(therapistId));
-                    setReviews(demoReviews.filter(r => r.therapistId === therapistId));
+                } else {
+                    setAvailability(availabilityDocs.docs.map(d => ({ id: d.id, ...d.data() })) as Availability[]);
                 }
-            } finally {
-                setLoading(false);
+
+                // Fetch bookings for this therapist
+                const bookingsQuery = query(
+                    collection(db, 'bookings'),
+                    where('therapistId', '==', therapistId)
+                );
+                const bookingsDocs = await getDocs(bookingsQuery);
+                setExistingBookings(bookingsDocs.docs.map(d => ({
+                    id: d.id,
+                    ...d.data(),
+                    sessionTime: d.data().sessionTime?.toDate() || new Date(),
+                    createdAt: d.data().createdAt?.toDate() || new Date(),
+                })) as Booking[]);
+
+                // Fetch reviews
+                const reviewsQuery = query(
+                    collection(db, 'feedback'),
+                    where('therapistId', '==', therapistId),
+                    where('isPublic', '==', true)
+                );
+                const reviewsDocs = await getDocs(reviewsQuery);
+                setReviews(reviewsDocs.docs.map(d => ({
+                    id: d.id,
+                    ...d.data(),
+                    createdAt: d.data().createdAt?.toDate() || new Date(),
+                })) as Feedback[]);
+
+            } catch (error) {
+                console.error("Error fetching aux data:", error);
+                // Fallback for reviews/availability if needed
+                setAvailability(getDefaultAvailability(therapistId));
             }
         }
 
-        fetchData();
+        // 1. Set up real-time listener for Therapist Document
+        // This ensures rating/reviewCount updates instantly
+        unsubscribeTherapist = onSnapshot(doc(db, 'therapists', therapistId), (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const data = docSnapshot.data();
+                console.log("Real-time Therapist Data Update:", data.rating, data.reviewCount);
+                setTherapist({
+                    id: docSnapshot.id,
+                    ...data,
+                    lastOnline: data.lastOnline?.toDate() || new Date(),
+                } as Therapist);
+                setLoading(false);
+            } else {
+                // Demo data fallback
+                const demo = demoTherapists[therapistId];
+                if (demo) {
+                    console.log("Using Demo Data fallback");
+                    setTherapist(demo);
+                    setReviews(demoReviews.filter(r => r.therapistId === therapistId)); // Load demo reviews too
+                }
+                setLoading(false);
+            }
+        }, (error) => {
+            console.error("Error fetching therapist:", error);
+            const demo = demoTherapists[therapistId];
+            if (demo) {
+                setTherapist(demo);
+            }
+            setLoading(false);
+        });
+
+        // 2. Fetch other data
+        fetchAuxData();
+
+        return () => {
+            if (unsubscribeTherapist) unsubscribeTherapist();
+        };
     }, [therapistId]);
 
     const handleBookNow = () => {
@@ -305,11 +319,15 @@ export default function TherapistProfilePage() {
                                         </p>
 
                                         <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--neutral-500)]">
-                                            {reviews.length > 0 && (
+                                            {(therapist.reviewCount || reviews.length) > 0 && (
                                                 <div className="flex items-center">
                                                     <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-1" />
-                                                    <span className="font-medium text-[var(--neutral-700)]">{avgRating.toFixed(1)}</span>
-                                                    <span className="ml-1">({reviews.length} reviews)</span>
+                                                    <span className="font-medium text-[var(--neutral-700)]">
+                                                        {(therapist.rating || avgRating).toFixed(1)}
+                                                    </span>
+                                                    <span className="ml-1">
+                                                        ({therapist.reviewCount || reviews.length} reviews)
+                                                    </span>
                                                 </div>
                                             )}
                                             <div className="flex items-center">

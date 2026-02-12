@@ -14,7 +14,7 @@ import {
 import { Availability, BusySlot, Booking, TimeSlot } from '@/types';
 
 // Session duration in minutes
-const SESSION_DURATION = 60;
+const SESSION_DURATION = 50;
 // Minimum hours before booking
 const MIN_BOOKING_HOURS = 2;
 // Days to show in calendar
@@ -161,45 +161,65 @@ export function isTherapistWorking(availability: Availability[]): boolean {
 }
 
 /**
- * Default availability template (Mon-Fri, 9-5 with lunch break)
+ * Generate availability based on working hours
  */
-export function getDefaultAvailability(therapistId: string): Availability[] {
-    const defaultSchedule: Availability[] = [];
+export function generateAvailabilityFromHours(
+    therapistId: string,
+    start: string = '10:30',
+    end: string = '19:00',
+    lunchStart: string = '13:00'
+): Availability[] {
+    const schedule: Availability[] = [];
+    const lunchEnd = formatTimeSlot(lunchStart).includes('PM')
+        ? `${(parseInt(lunchStart.split(':')[0]) + 1)}:${lunchStart.split(':')[1]}` // Simple check, better to use date-fns for robustness
+        : (() => {
+            const [h, m] = lunchStart.split(':').map(Number);
+            const date = setMinutes(setHours(new Date(), h), m);
+            return format(addHours(date, 1), 'HH:mm');
+        })();
 
     // Monday to Saturday (1-6)
     for (let day = 1; day <= 6; day++) {
-        // Morning session
-        defaultSchedule.push({
+        // Morning Session (Start -> Lunch Start)
+        schedule.push({
             id: `${therapistId}-${day}-morning`,
             therapistId,
             dayOfWeek: day,
-            startTime: '09:00',
-            endTime: '13:00',
+            startTime: start,
+            endTime: lunchStart,
             isBreak: false,
         });
 
-        // Lunch break
-        defaultSchedule.push({
+        // Lunch Break (Mandatory 1 hour)
+        schedule.push({
             id: `${therapistId}-${day}-lunch`,
             therapistId,
             dayOfWeek: day,
-            startTime: '13:00',
-            endTime: '15:00',
+            startTime: lunchStart,
+            endTime: format(addHours(parseISO(`2000-01-01T${lunchStart}`), 1), 'HH:mm'),
             isBreak: true,
         });
 
         // Afternoon session
-        defaultSchedule.push({
+        // Afternoon session
+        schedule.push({
             id: `${therapistId}-${day}-afternoon`,
             therapistId,
             dayOfWeek: day,
-            startTime: '15:00',
-            endTime: '18:00',
+            startTime: format(addHours(parseISO(`2000-01-01T${lunchStart}`), 1), 'HH:mm'),
+            endTime: end,
             isBreak: false,
         });
     }
 
-    return defaultSchedule;
+    return schedule;
+}
+
+/**
+ * Default availability template (Mon-Sat, 10:30-19:00 with 13:00 lunch)
+ */
+export function getDefaultAvailability(therapistId: string): Availability[] {
+    return generateAvailabilityFromHours(therapistId, '10:30', '19:00', '13:00');
 }
 
 /**

@@ -14,6 +14,7 @@ const fadeInUp = {
     visible: { opacity: 1, y: 0 }
 };
 
+
 function SignupForm() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -22,6 +23,11 @@ function SignupForm() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // OTP States
+    const [step, setStep] = useState(1); // 1: Details, 2: OTP
+    const [otp, setOtp] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
 
     const { signup } = useAuth();
     const router = useRouter();
@@ -34,7 +40,7 @@ function SignupForm() {
         { met: /[0-9]/.test(password), text: 'One number' },
     ];
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
@@ -51,19 +57,52 @@ function SignupForm() {
         setIsLoading(true);
 
         try {
+            const res = await fetch('/api/auth/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to send OTP');
+            }
+
+            setOtpSent(true);
+            setStep(2);
+        } catch (err: any) {
+            setError(err.message || 'Failed to send OTP');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleVerifyAndSignup = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        try {
+            // Verify OTP
+            const res = await fetch('/api/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Invalid OTP');
+            }
+
+            // If verified, proceed to Create Account
             await signup(email, password, name);
             router.push(redirectTo);
         } catch (err: unknown) {
             if (err instanceof Error) {
-                if (err.message.includes('email-already-in-use')) {
-                    setError('An account with this email already exists.');
-                } else if (err.message.includes('weak-password')) {
-                    setError('Please choose a stronger password.');
-                } else if (err.message.includes('invalid-email')) {
-                    setError('Please enter a valid email address.');
-                } else {
-                    setError('Unable to create account. Please try again.');
-                }
+                setError(err.message);
             } else {
                 setError('An unexpected error occurred.');
             }
@@ -82,128 +121,177 @@ function SignupForm() {
             <div className="bg-white rounded-2xl shadow-lg p-8 md:p-10">
                 <div className="text-center mb-8">
                     <h1 className="font-serif text-3xl text-[var(--primary-700)] mb-2">
-                        Begin Your Journey
+                        {step === 1 ? 'Begin Your Journey' : 'Verify Email'}
                     </h1>
                     <p className="text-[var(--neutral-500)]">
-                        Create an account to book appointments
+                        {step === 1 ? 'Create an account to book appointments' : `Enter the code sent to ${email}`}
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    {error && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm"
-                        >
-                            {error}
-                        </motion.div>
-                    )}
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm"
+                    >
+                        {error}
+                    </motion.div>
+                )}
 
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
-                            Full Name
-                        </label>
-                        <input
-                            id="name"
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="input"
-                            placeholder="Your full name"
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
-                            Email Address
-                        </label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="input"
-                            placeholder="you@example.com"
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
-                            Password
-                        </label>
-                        <div className="relative">
+                {step === 1 ? (
+                    <form onSubmit={handleSendOtp} className="space-y-5">
+                        <div>
+                            <label htmlFor="name" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                Full Name
+                            </label>
                             <input
-                                id="password"
-                                type={showPassword ? 'text' : 'password'}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="input pr-10"
+                                id="name"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="input"
+                                placeholder="Your full name"
+                                required
+                                disabled={isLoading}
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                Email Address
+                            </label>
+                            <input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="input"
+                                placeholder="you@example.com"
+                                required
+                                disabled={isLoading}
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="password" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                Password
+                            </label>
+                            <div className="relative">
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="input pr-10"
+                                    placeholder="••••••••"
+                                    required
+                                    disabled={isLoading}
+                                    minLength={8}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--neutral-400)] hover:text-[var(--neutral-600)]"
+                                >
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
+
+                            {password.length > 0 && (
+                                <div className="mt-3 space-y-1">
+                                    {passwordRequirements.map((req, i) => (
+                                        <div key={i} className="flex items-center text-xs">
+                                            <div className={`w-4 h-4 rounded-full mr-2 flex items-center justify-center ${req.met ? 'bg-green-100 text-green-600' : 'bg-[var(--neutral-100)] text-[var(--neutral-400)]'
+                                                }`}>
+                                                <Check className="w-3 h-3" />
+                                            </div>
+                                            <span className={req.met ? 'text-green-600' : 'text-[var(--neutral-500)]'}>
+                                                {req.text}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                Confirm Password
+                            </label>
+                            <input
+                                id="confirmPassword"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="input"
                                 placeholder="••••••••"
                                 required
                                 disabled={isLoading}
                             />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--neutral-400)] hover:text-[var(--neutral-600)]"
-                            >
-                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </button>
                         </div>
 
-                        {password.length > 0 && (
-                            <div className="mt-3 space-y-1">
-                                {passwordRequirements.map((req, i) => (
-                                    <div key={i} className="flex items-center text-xs">
-                                        <div className={`w-4 h-4 rounded-full mr-2 flex items-center justify-center ${req.met ? 'bg-green-100 text-green-600' : 'bg-[var(--neutral-100)] text-[var(--neutral-400)]'
-                                            }`}>
-                                            <Check className="w-3 h-3" />
-                                        </div>
-                                        <span className={req.met ? 'text-green-600' : 'text-[var(--neutral-500)]'}>
-                                            {req.text}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
-                            Confirm Password
-                        </label>
-                        <input
-                            id="confirmPassword"
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="input"
-                            placeholder="••••••••"
-                            required
+                        <button
+                            type="submit"
                             disabled={isLoading}
-                        />
-                    </div>
+                            className="w-full btn btn-primary py-3 text-base disabled:opacity-50"
+                        >
+                            {isLoading ? (
+                                <span className="flex items-center justify-center">
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    Sending OTP...
+                                </span>
+                            ) : (
+                                'Continue'
+                            )}
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleVerifyAndSignup} className="space-y-5">
+                        <div>
+                            <label htmlFor="otp" className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                Verification Code
+                            </label>
+                            <input
+                                id="otp"
+                                type="text"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                                className="input text-center text-2xl tracking-widest"
+                                placeholder="000000"
+                                required
+                                disabled={isLoading}
+                                maxLength={6}
+                            />
+                            <p className="mt-2 text-xs text-center text-[var(--neutral-500)]">
+                                Did not receive code? <button type="button" onClick={() => setStep(1)} className="text-[var(--primary-600)] hover:underline">Resend</button>
+                            </p>
+                        </div>
 
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full btn btn-primary py-3 text-base disabled:opacity-50"
-                    >
-                        {isLoading ? (
-                            <span className="flex items-center justify-center">
-                                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                Creating account...
-                            </span>
-                        ) : (
-                            'Create Account'
-                        )}
-                    </button>
-                </form>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full btn btn-primary py-3 text-base disabled:opacity-50"
+                        >
+                            {isLoading ? (
+                                <span className="flex items-center justify-center">
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    Verifying...
+                                </span>
+                            ) : (
+                                'Verify & Create Account'
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setStep(1)}
+                            disabled={isLoading}
+                            className="w-full text-sm text-[var(--neutral-500)] hover:text-[var(--neutral-700)]"
+                        >
+                            Back
+                        </button>
+                    </form>
+                )}
 
                 <div className="mt-6 text-center">
                     <p className="text-[var(--neutral-500)]">
@@ -224,6 +312,7 @@ function SignupForm() {
         </motion.div>
     );
 }
+
 
 function SignupFormFallback() {
     return (

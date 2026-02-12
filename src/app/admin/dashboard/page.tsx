@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Booking, Therapist, Feedback } from '@/types';
-import { format, subDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import {
     Calendar,
     Users,
@@ -147,45 +147,83 @@ export default function AdminDashboardPage() {
             if (!user) return;
 
             try {
-                // Fetch bookings
-                const bookingsQuery = query(
+                // 1. Fetch Recent Bookings for the list
+                const recentBookingsQuery = query(
                     collection(db, 'bookings'),
                     orderBy('createdAt', 'desc'),
-                    limit(10)
+                    limit(5)
                 );
-                const bookingsDocs = await getDocs(bookingsQuery);
+                const recentBookingsDocs = await getDocs(recentBookingsQuery);
 
-                if (!bookingsDocs.empty) {
-                    const bookings = bookingsDocs.docs.map((doc) => ({
+                if (!recentBookingsDocs.empty) {
+                    const bookings = recentBookingsDocs.docs.map((doc) => ({
                         id: doc.id,
                         ...doc.data(),
                         sessionTime: doc.data().sessionTime?.toDate() || new Date(),
                         createdAt: doc.data().createdAt?.toDate() || new Date(),
                     })) as Booking[];
-                    setRecentBookings(bookings.slice(0, 5));
-
-                    // Calculate stats
-                    const now = new Date();
-                    const weekAgo = subDays(now, 7);
-                    const thisWeekBookings = bookings.filter((b) =>
-                        isWithinInterval(b.createdAt, { start: startOfDay(weekAgo), end: endOfDay(now) })
-                    );
-
-                    const uniqueClients = new Set(bookings.map((b) => b.clientId));
-                    const totalRevenue = bookings
-                        .filter((b) => b.paymentStatus === 'paid')
-                        .reduce((acc, b) => acc + (b.amount || 0), 0);
-
-                    setStats((prev) => ({
-                        ...prev,
-                        totalBookings: bookings.length,
-                        thisWeekBookings: thisWeekBookings.length,
-                        totalClients: uniqueClients.size,
-                        totalRevenue,
-                    }));
+                    setRecentBookings(bookings);
                 }
 
-                // Fetch feedback
+                // 2. Calculate Monthly Stats
+                const now = new Date();
+                const monthStart = startOfMonth(now);
+                const monthEnd = endOfMonth(now);
+
+                // Fetch ALL bookings for the current month
+                const monthBookingsQuery = query(
+                    collection(db, 'bookings'),
+                    where('createdAt', '>=', monthStart),
+                    where('createdAt', '<=', monthEnd)
+                );
+                const monthBookingsDocs = await getDocs(monthBookingsQuery);
+                const monthBookings = monthBookingsDocs.docs.map(doc => ({
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt?.toDate() || new Date(),
+                })) as Booking[];
+
+                const monthlyCount = monthBookings.length;
+
+                // Calculate stats based on monthly data
+                const weekAgo = subDays(now, 7);
+                const thisWeekBookings = monthBookings.filter((b) =>
+                    isWithinInterval(b.createdAt, { start: startOfDay(weekAgo), end: endOfDay(now) })
+                ).length;
+
+                // Total revenue for the month
+                const totalRevenue = monthBookings
+                    .filter((b) => b.paymentStatus === 'paid')
+                    .reduce((acc, b) => acc + (b.amount || 0), 0);
+
+                // 3. precise Total Clients Count
+                // Query all users with role 'client'
+                const clientsQuery = query(
+                    collection(db, 'users'),
+                    where('role', '==', 'client')
+                );
+                const clientsDocs = await getDocs(clientsQuery);
+                const totalClients = clientsDocs.size;
+
+                // 4. precise Average Rating
+                // Fetch ALL feedback to get accurate average
+                const allFeedbackQuery = query(collection(db, 'feedback'));
+                const allFeedbackDocs = await getDocs(allFeedbackQuery);
+                let avgRating = 0;
+                if (!allFeedbackDocs.empty) {
+                    const totalRating = allFeedbackDocs.docs.reduce((acc, doc) => acc + (doc.data().rating || 0), 0);
+                    avgRating = totalRating / allFeedbackDocs.size;
+                }
+
+                setStats((prev) => ({
+                    ...prev,
+                    totalBookings: monthlyCount,
+                    thisWeekBookings: thisWeekBookings,
+                    totalClients: totalClients,
+                    totalRevenue,
+                    avgRating: avgRating,
+                }));
+
+                // Fetch recent feedback for display
                 const feedbackQuery = query(
                     collection(db, 'feedback'),
                     orderBy('createdAt', 'desc'),
@@ -200,10 +238,6 @@ export default function AdminDashboardPage() {
                         createdAt: doc.data().createdAt?.toDate() || new Date(),
                     })) as Feedback[];
                     setRecentFeedback(feedback);
-
-                    // Calculate average rating
-                    const avgRating = feedback.reduce((acc, f) => acc + f.rating, 0) / feedback.length;
-                    setStats((prev) => ({ ...prev, avgRating }));
                 }
 
                 // Fetch therapist count
@@ -212,7 +246,7 @@ export default function AdminDashboardPage() {
                     where('isEnabled', '==', true)
                 );
                 const therapistsDocs = await getDocs(therapistsQuery);
-                setStats((prev) => ({ ...prev, totalTherapists: therapistsDocs.size || 5 }));
+                setStats((prev) => ({ ...prev, totalTherapists: therapistsDocs.size || 0 }));
 
             } catch (error) {
                 console.log('Using demo data:', error);
@@ -286,7 +320,7 @@ export default function AdminDashboardPage() {
                                     </span>
                                 </div>
                                 <p className="text-2xl font-bold text-[var(--primary-700)]">{stats.totalBookings}</p>
-                                <p className="text-sm text-[var(--neutral-500)]">Total Bookings</p>
+                                <p className="text-sm text-[var(--neutral-500)]">Bookings (This Month)</p>
                             </div>
 
                             <div className="bg-white rounded-xl p-5 shadow-sm">

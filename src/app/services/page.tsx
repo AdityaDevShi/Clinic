@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
@@ -32,96 +31,53 @@ const staggerContainer = {
 
 const services = [
     {
-        id: 'individual',
-        icon: User,
-        title: 'Individual Therapy',
-        description: 'One-on-one sessions tailored to your unique needs. We address anxiety, depression, stress, trauma, grief, relationship issues, and personal growth.',
-        duration: '50 minutes',
-        price: '₹2,500',
-        features: [
-            'Personalized treatment plans',
-            'Evidence-based approaches (CBT, DBT, EMDR)',
-            'Safe and confidential space',
-            'Online or in-person sessions',
-        ],
-    },
-    {
-        id: 'child',
-        icon: Heart,
-        title: 'Child & Adolescent Therapy',
-        description: 'Specialized support for young minds. We help children and teenagers navigate emotional challenges, behavioral issues, academic stress, and developmental transitions.',
-        duration: '45 minutes',
-        price: '₹2,000',
-        features: [
-            'Play therapy techniques',
-            'Parent guidance sessions',
-            'School-related support',
-            'Age-appropriate interventions',
-        ],
-    },
-    {
-        id: 'couples',
-        icon: Users,
-        title: 'Couples Counseling',
-        description: 'Strengthen your relationship through improved communication, conflict resolution, and deeper emotional connection. We help couples at any stage of their relationship.',
-        duration: '60 minutes',
-        price: '₹3,500',
-        features: [
-            'Communication skill building',
-            'Conflict resolution strategies',
-            'Intimacy enhancement',
-            'Pre-marital counseling available',
-        ],
-    },
-    {
-        id: 'training',
+        id: 'assessments',
         icon: ClipboardList,
-        title: 'Training & Supervision',
-        description: 'Professional training programs and supervision for psychology students and interns. We offer hands-on experience and guidance for aspiring mental health professionals.',
+        title: 'Psychodiagnostics Assessments',
+        description: 'Comprehensive psychological testing to understand cognitive, emotional, and behavioral functioning. We provide detailed reports for clinical and developmental insights.',
         duration: 'Varies',
         price: 'Contact Us',
         features: [
-            'Clinical internship programs',
-            'Case conceptualization supervision',
-            'Skill building workshops',
-            'Research guidance',
+            'IQ & Developmental Testing',
+            'Neuropsychological Testing',
+            'Personality Profiling',
+            'Behavioral Checklists',
+            'IVF Donor Assessment'
         ],
     },
-];
-
-const packages = [
     {
-        name: 'Single Session',
-        description: 'Perfect for a first consultation or one-time guidance.',
-        sessions: 1,
-        discount: 0,
+        id: 'therapy',
+        icon: Heart,
+        title: 'Psychotherapy & Counseling',
+        description: 'Evidence-based therapeutic interventions for individuals, couples, and families. We treat a wide range of concerns using proven modalities.',
+        duration: '45-50 mins',
+        price: 'Varies',
+        features: [
+            'CBT, DBT, ACT & Trauma Counseling',
+            'Child, Adolescent & Play Therapy',
+            'Family & Couples Counseling',
+            'Dementia Care & Stroke Rehab',
+            'ADHD & Autism Interventions'
+        ],
     },
     {
-        name: '1 Month Care',
-        description: 'Consistent weekly support to start your healing journey.',
-        sessions: 4,
-        discount: 10,
-        popular: false,
-    },
-    {
-        name: '2 Months Care',
-        description: 'Dedicated weekly support for deeper progress and growth.',
-        sessions: 8,
-        discount: 15,
-        popular: true,
-    },
-    {
-        name: '3 Months Care',
-        description: 'Comprehensive long-term support for sustainable change.',
-        sessions: 12,
-        discount: 20,
-        popular: false,
+        id: 'internship',
+        icon: Users,
+        title: 'Psychology Internship Program',
+        description: 'Structured training for aspiring mental health professionals. Gain hands-on clinical exposure under expert supervision.',
+        duration: '1-6 Months',
+        price: 'Contact Us',
+        features: [
+            'Supervised Clinical Exposure',
+            'Hands-on Assessment Training',
+            'Case Documentation & Reporting',
+            'Therapy Observations',
+            'Certification Provided'
+        ],
     },
 ];
 
 export default function ServicesPage() {
-    const [sessionsPerWeek, setSessionsPerWeek] = useState(1);
-
     return (
         <div className="min-h-screen">
             <Header />
@@ -232,22 +188,9 @@ export default function ServicesPage() {
                         variants={staggerContainer}
                         className="text-center mb-12"
                     >
-                        <motion.h2
-                            variants={fadeInUp}
-                            className="font-serif text-3xl md:text-4xl text-[var(--primary-700)] mb-4"
-                        >
-                            Therapy Packages
-                        </motion.h2>
-                        <motion.div variants={fadeInUp} className="section-divider mb-6" />
-                        <motion.p
-                            variants={fadeInUp}
-                            className="text-[var(--neutral-600)] max-w-2xl mx-auto"
-                        >
-                            Save with our therapy packages designed to support your journey towards mental wellness.
-                        </motion.p>
                     </motion.div>
 
-                    {/* Frequency Selector */}
+                    {/* Frequency Selector -- REMOVED -- */}
                     <motion.div
                         initial="hidden"
                         whileInView="visible"
@@ -255,21 +198,6 @@ export default function ServicesPage() {
                         variants={fadeInUp}
                         className="flex flex-col items-center justify-center mb-12"
                     >
-                        <p className="text-[var(--neutral-600)] mb-4 font-medium">How many sessions per week?</p>
-                        <div className="flex items-center gap-2 bg-[var(--neutral-100)] p-1 rounded-full">
-                            {[1, 2, 3, 4, 5].map((num) => (
-                                <button
-                                    key={num}
-                                    onClick={() => setSessionsPerWeek(num)}
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${sessionsPerWeek === num
-                                            ? 'bg-[var(--primary-600)] text-white shadow-md transform scale-105'
-                                            : 'text-[var(--neutral-500)] hover:bg-white hover:text-[var(--primary-600)]'
-                                        }`}
-                                >
-                                    {num}x
-                                </button>
-                            ))}
-                        </div>
                     </motion.div>
 
                     <motion.div
@@ -279,59 +207,6 @@ export default function ServicesPage() {
                         variants={staggerContainer}
                         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
                     >
-                        {packages.map((pkg) => {
-                            // Calculate total sessions:
-                            // Single Session always 1.
-                            // Others: base weeks (4, 8, 12) * sessionsPerWeek.
-                            // Base sessions defs in 'packages' array were 4, 8, 12.
-                            // So we can assume pkg.sessions is the "1x per week" count (which equals weeks).
-                            const isSingle = pkg.name === 'Single Session';
-                            const totalSessions = isSingle ? 1 : pkg.sessions * sessionsPerWeek;
-
-                            return (
-                                <motion.div
-                                    key={pkg.name}
-                                    variants={fadeInUp}
-                                    className={`bg-white rounded-xl p-6 text-center relative flex flex-col ${pkg.popular ? 'ring-2 ring-[var(--secondary-500)] shadow-lg' : 'shadow-sm'
-                                        }`}
-                                >
-                                    {pkg.popular && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[var(--secondary-500)] text-white text-xs font-medium px-3 py-1 rounded-full">
-                                            Most Popular
-                                        </div>
-                                    )}
-                                    <h3 className="font-serif text-lg font-semibold text-[var(--primary-700)] mb-2">
-                                        {pkg.name}
-                                    </h3>
-                                    <p className="text-sm text-[var(--neutral-500)] mb-4 flex-grow">
-                                        {pkg.description}
-                                    </p>
-                                    <div className="text-3xl font-bold text-[var(--primary-600)] mb-1">
-                                        {totalSessions}
-                                    </div>
-                                    <div className="text-sm text-[var(--neutral-500)] mb-6">
-                                        sessions
-                                        {!isSingle && <span className="text-xs ml-1 text-[var(--neutral-400)]">({sessionsPerWeek}/week)</span>}
-                                    </div>
-
-                                    {pkg.discount > 0 && (
-                                        <div className="text-sm font-medium text-[var(--secondary-600)] mb-4">
-                                            Save {pkg.discount}%
-                                        </div>
-                                    )}
-
-                                    <Link
-                                        href="/therapists"
-                                        className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${pkg.popular
-                                                ? 'bg-[var(--primary-600)] text-white hover:bg-[var(--primary-700)]'
-                                                : 'bg-[var(--neutral-100)] text-[var(--neutral-700)] hover:bg-[var(--neutral-200)]'
-                                            }`}
-                                    >
-                                        Book Now
-                                    </Link>
-                                </motion.div>
-                            );
-                        })}
                     </motion.div>
                 </div>
             </section>

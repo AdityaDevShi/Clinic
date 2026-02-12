@@ -49,13 +49,13 @@ export default function Footer() {
                             Providing compassionate and confidential psychological support to help individuals find clarity and emotional balance.
                         </p>
                         <div className="space-y-3">
-                            <a href="tel:+919876543210" className="flex items-center space-x-2 text-[var(--primary-200)] hover:text-white transition-colors text-sm">
+                            <a href="tel:+917075829856" className="flex items-center space-x-2 text-[var(--primary-200)] hover:text-white transition-colors text-sm">
                                 <Phone className="w-4 h-4" />
-                                <span>+91 98765 43210</span>
+                                <span>+91 7075829856</span>
                             </a>
-                            <a href="mailto:info@arambhmentalhealth.com" className="flex items-center space-x-2 text-[var(--primary-200)] hover:text-white transition-colors text-sm">
+                            <a href="mailto:care@arambh.net" className="flex items-center space-x-2 text-[var(--primary-200)] hover:text-white transition-colors text-sm">
                                 <Mail className="w-4 h-4" />
-                                <span>info@arambhmentalhealth.com</span>
+                                <span>care@arambh.net</span>
                             </a>
                             <div className="flex items-center space-x-2 text-[var(--primary-200)] text-sm">
                                 <MapPin className="w-4 h-4 flex-shrink-0" />

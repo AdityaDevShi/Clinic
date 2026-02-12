@@ -1,0 +1,47 @@
+import { Therapist } from '@/types';
+
+// Demo therapists
+export const demoTherapists: Record<string, Therapist> = {
+    '1': {
+        id: '1',
+        name: 'Dr. Shiwani Kohli',
+        email: 'shiwani@arambhmentalhealth.com',
+        specialization: 'Clinical Psychology',
+        bio: 'RCI Registered Clinical Psychologist with over 10 years of experience in treating anxiety disorders, depression, trauma, and stress-related conditions. Dr. Kohli uses an integrative approach combining Cognitive Behavioral Therapy (CBT), mindfulness techniques, and person-centered therapy to help clients achieve lasting positive change.\n\nHer warm and empathetic approach creates a safe space for clients to explore their challenges and develop effective coping strategies. She is passionate about mental health awareness and believes in empowering individuals to take charge of their emotional well-being.',
+        photoUrl: undefined,
+        isOnline: true,
+        isEnabled: true,
+        hourlyRate: 2500,
+        lastOnline: new Date(),
+        qualifications: ['M.Phil Clinical Psychology', 'RCI Registered (A12945)', 'CBT Certified', 'Trauma-Informed Care'],
+        languages: ['English', 'Hindi'],
+    },
+    '2': {
+        id: '2',
+        name: 'Dr. Priya Sharma',
+        email: 'priya@arambhmentalhealth.com',
+        specialization: 'Child & Adolescent Psychology',
+        bio: 'Specialized in working with children and teenagers facing emotional, behavioral, and developmental challenges. Dr. Sharma uses play therapy, art therapy, and CBT approaches tailored for young minds.\n\nWith a gentle and patient approach, she helps young clients express themselves and develop healthy coping mechanisms. She works closely with parents to create supportive home environments.',
+        photoUrl: undefined,
+        isOnline: true,
+        isEnabled: true,
+        hourlyRate: 2000,
+        lastOnline: new Date(),
+        qualifications: ['Ph.D. Child Psychology', 'Play Therapy Certified', 'Child Development Specialist'],
+        languages: ['English', 'Hindi', 'Punjabi'],
+    },
+    '3': {
+        id: '3',
+        name: 'Dr. Rahul Verma',
+        email: 'rahul@arambhmentalhealth.com',
+        specialization: 'Couples & Family Therapy',
+        bio: 'Expert in relationship counseling and family dynamics with over 8 years of experience. Dr. Verma helps couples improve communication, resolve conflicts, and strengthen their emotional bond.\n\nHe specializes in premarital counseling, marriage therapy, and family mediation. His approach is collaborative and solution-focused, helping families navigate transitions and challenges together.',
+        photoUrl: undefined,
+        isOnline: false,
+        isEnabled: true,
+        hourlyRate: 3500,
+        lastOnline: new Date(Date.now() - 3600000),
+        qualifications: ['M.A. Clinical Psychology', 'Certified Couples Therapist', 'Family Systems Training'],
+        languages: ['English', 'Hindi'],
+    },
+};

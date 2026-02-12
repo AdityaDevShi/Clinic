@@ -128,11 +128,30 @@ export default function AdminTherapistsPage() {
                 const therapistsDocs = await getDocs(therapistsQuery);
 
                 if (!therapistsDocs.empty) {
-                    const fetchedTherapists = therapistsDocs.docs.map((doc) => ({
-                        id: doc.id,
-                        ...doc.data(),
-                        lastOnline: doc.data().lastOnline?.toDate() || new Date(),
-                    })) as Therapist[];
+                    const fetchedTherapists = therapistsDocs.docs
+                        .map((doc) => {
+                            try {
+                                const data = doc.data();
+                                return {
+                                    id: doc.id,
+                                    ...data,
+                                    // Safe date handling
+                                    lastOnline: data.lastOnline?.toDate ? data.lastOnline.toDate() : new Date(),
+                                };
+                            } catch (err) {
+                                console.error(`Error processing therapist doc ${doc.id}:`, err);
+                                return null;
+                            }
+                        })
+                        // Filter out nulls and invalid/ghost accounts
+                        .filter((t: any) =>
+                            t !== null &&
+                            typeof t.name === 'string' &&
+                            t.name.trim() !== '' &&
+                            typeof t.email === 'string' &&
+                            t.email.trim() !== ''
+                        ) as Therapist[];
+
                     setTherapists(fetchedTherapists);
                 }
             } catch (error) {
@@ -148,17 +167,21 @@ export default function AdminTherapistsPage() {
     }, [user, authLoading, router]);
 
     const toggleTherapistStatus = async (therapist: Therapist) => {
+        console.log('Toggling therapist:', therapist.id, therapist.name);
         try {
             await updateDoc(doc(db, 'therapists', therapist.id), {
                 isEnabled: !therapist.isEnabled,
             });
-            setTherapists((prev) =>
-                prev.map((t) =>
+
+            setTherapists((prev) => {
+                const updated = prev.map((t) =>
                     t.id === therapist.id ? { ...t, isEnabled: !t.isEnabled } : t
-                )
-            );
+                );
+                console.log('Updated therapists count:', updated.length);
+                return updated;
+            });
         } catch (error) {
-            console.log('Error updating therapist:', error);
+            console.error('Error updating therapist, reverting to local update:', error);
             // Update locally anyway for demo
             setTherapists((prev) =>
                 prev.map((t) =>
@@ -230,11 +253,14 @@ export default function AdminTherapistsPage() {
         }
     };
 
-    const filteredTherapists = therapists.filter((t) =>
-        t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.specialization.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredTherapists = therapists.filter((t) => {
+        const term = searchTerm.toLowerCase();
+        return (
+            (t.name || '').toLowerCase().includes(term) ||
+            (t.email || '').toLowerCase().includes(term) ||
+            (t.specialization || '').toLowerCase().includes(term)
+        );
+    });
 
     if (authLoading || loading) {
         return (
@@ -338,7 +364,11 @@ export default function AdminTherapistsPage() {
                                                 <td className="py-4 px-6">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
-                                                            onClick={() => toggleTherapistStatus(therapist)}
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleTherapistStatus(therapist);
+                                                            }}
                                                             className={`p-2 rounded-lg transition-colors ${therapist.isEnabled
                                                                 ? 'hover:bg-red-50 text-red-600'
                                                                 : 'hover:bg-green-50 text-green-600'

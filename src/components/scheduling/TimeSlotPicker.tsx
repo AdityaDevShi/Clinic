@@ -18,6 +18,7 @@ interface TimeSlotPickerProps {
     selectedSlot: TimeSlot | null;
     onSelectSlot: (slot: TimeSlot | null) => void;
     disabled?: boolean;
+    showAllSlots?: boolean;
 }
 
 export default function TimeSlotPicker({
@@ -27,6 +28,7 @@ export default function TimeSlotPicker({
     selectedSlot,
     onSelectSlot,
     disabled = false,
+    showAllSlots = false,
 }: TimeSlotPickerProps) {
     const [availableDates, setAvailableDates] = useState<Date[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -65,7 +67,7 @@ export default function TimeSlotPicker({
     };
 
     const visibleDates = availableDates.slice(dateStartIndex, dateStartIndex + datesToShow);
-    const availableSlots = timeSlots.filter((slot) => slot.isAvailable);
+    const availableSlots = showAllSlots ? timeSlots : timeSlots.filter((slot) => slot.isAvailable);
 
     return (
         <div className="space-y-6">
@@ -106,8 +108,8 @@ export default function TimeSlotPicker({
                                 }}
                                 disabled={disabled}
                                 className={`flex-1 p-3 rounded-xl text-center transition-all duration-200 ${isSelected
-                                        ? 'bg-[var(--secondary-500)] text-white shadow-md'
-                                        : 'bg-[var(--warm-50)] hover:bg-[var(--warm-100)] text-[var(--neutral-700)]'
+                                    ? 'bg-[var(--secondary-500)] text-white shadow-md'
+                                    : 'bg-[var(--warm-50)] hover:bg-[var(--warm-100)] text-[var(--neutral-700)]'
                                     } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <div className="text-xs font-medium uppercase tracking-wide mb-1">
@@ -160,8 +162,8 @@ export default function TimeSlotPicker({
                                         onClick={() => onSelectSlot(isSelected ? null : slot)}
                                         disabled={disabled}
                                         className={`py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${isSelected
-                                                ? 'bg-[var(--secondary-500)] text-white shadow-md ring-2 ring-[var(--secondary-300)]'
-                                                : 'bg-white border border-[var(--border)] hover:border-[var(--secondary-400)] hover:bg-[var(--warm-50)] text-[var(--neutral-700)]'
+                                            ? 'bg-[var(--secondary-500)] text-white shadow-md ring-2 ring-[var(--secondary-300)]'
+                                            : 'bg-white border border-[var(--border)] hover:border-[var(--secondary-400)] hover:bg-[var(--warm-50)] text-[var(--neutral-700)]'
                                             } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         {formatTimeSlot(slot.time)}
