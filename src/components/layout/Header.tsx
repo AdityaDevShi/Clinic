@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, ChevronDown, Power } from 'lucide-react';
@@ -122,21 +123,13 @@ export default function Header() {
                     {/* Logo */}
                     <Link href="/" className="flex items-center space-x-2">
                         <div className="w-10 h-10 flex items-center justify-center">
-                            <svg viewBox="0 0 40 40" className="w-full h-full">
-                                <path
-                                    d="M20 5 C12 5 8 12 8 18 C8 28 20 35 20 35 C20 35 32 28 32 18 C32 12 28 5 20 5"
-                                    fill="none"
-                                    stroke="var(--primary-500)"
-                                    strokeWidth="1.5"
-                                />
-                                <path
-                                    d="M20 10 C15 10 12 15 12 19 C12 25 20 30 20 30"
-                                    fill="none"
-                                    stroke="var(--primary-400)"
-                                    strokeWidth="1"
-                                />
-                                <circle cx="20" cy="18" r="3" fill="var(--primary-500)" />
-                            </svg>
+                            <Image
+                                src="/logo.png"
+                                alt="Arambh Logo"
+                                width={40}
+                                height={40}
+                                className="w-full h-full object-contain"
+                            />
                         </div>
                         <div className="flex flex-col">
                             <span className="font-serif text-xl font-semibold text-[var(--primary-700)]">

@@ -85,6 +85,7 @@ export interface Booking {
     createdAt: Date;
     notes?: string;
     isRated?: boolean;
+    meetLink?: string;
 }
 
 // Session notes by therapist

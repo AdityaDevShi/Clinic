@@ -9,7 +9,7 @@ import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Booking, TimeSlot } from '@/types';
 import { BookingService } from '@/services/bookingService';
@@ -86,6 +86,7 @@ export default function ClientBookingsPage() {
     const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [isRescheduling, setIsRescheduling] = useState(false);
+    const [meetLinks, setMeetLinks] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -110,7 +111,7 @@ export default function ClientBookingsPage() {
 
         const unsubscribe = onSnapshot(
             q,
-            (snapshot) => {
+            async (snapshot) => {
                 if (snapshot.empty) {
                     setBookings([]); // Empty initially, don't show demo data if user has no bookings? 
                     // actually user said they booked things. If empty, maybe they have none?
@@ -129,6 +130,24 @@ export default function ClientBookingsPage() {
                     fetchedBookings.sort((a, b) => b.sessionTime.getTime() - a.sessionTime.getTime());
 
                     setBookings(fetchedBookings);
+
+                    // Fetch meet links from session_links collection
+                    const uniqueTherapistIds = [...new Set(fetchedBookings.map(b => b.therapistId))];
+                    const linksMap: Record<string, string> = {};
+                    await Promise.all(
+                        uniqueTherapistIds.map(async (therapistId) => {
+                            try {
+                                const linkDocId = `${therapistId}_${user!.id}`;
+                                const linkDoc = await getDoc(doc(db, 'session_links', linkDocId));
+                                if (linkDoc.exists() && linkDoc.data().meetLink) {
+                                    linksMap[therapistId] = linkDoc.data().meetLink;
+                                }
+                            } catch (e) {
+                                console.error('Error fetching meet link for therapist:', therapistId, e);
+                            }
+                        })
+                    );
+                    setMeetLinks(linksMap);
                 }
                 setLoading(false);
             },
@@ -349,9 +368,22 @@ export default function ClientBookingsPage() {
                                             <div className="flex items-center gap-2 sm:flex-col sm:items-end">
                                                 {activeTab === 'upcoming' && booking.status === 'confirmed' && (
                                                     <>
-                                                        <button className="btn btn-primary py-2 px-4 text-sm flex items-center w-full justify-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                const link = meetLinks[booking.therapistId];
+                                                                if (link) {
+                                                                    window.open(link, '_blank');
+                                                                } else {
+                                                                    alert('Session link not available yet. Your therapist will add the link before the session.');
+                                                                }
+                                                            }}
+                                                            className={`btn py-2 px-4 text-sm flex items-center w-full justify-center ${meetLinks[booking.therapistId]
+                                                                ? 'btn-primary'
+                                                                : 'bg-[var(--neutral-100)] text-[var(--neutral-500)] cursor-default'
+                                                                }`}
+                                                        >
                                                             <Video className="w-4 h-4 mr-2" />
-                                                            Join
+                                                            {meetLinks[booking.therapistId] ? 'Join Session' : 'Link Pending'}
                                                         </button>
                                                         <div className="flex gap-2 w-full">
                                                             <button
