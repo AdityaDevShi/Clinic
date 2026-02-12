@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, FileText, Paperclip, Plus, Save, Clock, Calendar, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, FileText, Paperclip, Plus, Save, Clock, Calendar, Trash2, Loader2, AlertTriangle, Video, Check, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { db, storage } from '@/lib/firebase';
@@ -20,8 +20,11 @@ import {
     orderBy,
     serverTimestamp,
     getDoc,
+    setDoc,
+    updateDoc,
     Timestamp
 } from 'firebase/firestore';
+
 
 type Tab = 'notes' | 'attachments';
 
@@ -66,6 +69,9 @@ export default function PatientDetailsPage() {
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const [isDeletingPatient, setIsDeletingPatient] = useState(false);
+    const [meetLink, setMeetLink] = useState('');
+    const [savedMeetLink, setSavedMeetLink] = useState('');
+    const [savingMeetLink, setSavingMeetLink] = useState(false);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -129,6 +135,15 @@ export default function PatientDetailsPage() {
                 // Sort client-side
                 fetchedAttachments.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
                 setAttachments(fetchedAttachments);
+
+                // 4. Fetch session link for this patient-therapist pair
+                const linkDocId = `${user.id}_${patientId}`;
+                const linkDoc = await getDoc(doc(db, 'session_links', linkDocId));
+                if (linkDoc.exists()) {
+                    const link = linkDoc.data().meetLink || '';
+                    setMeetLink(link);
+                    setSavedMeetLink(link);
+                }
 
             } catch (error) {
                 console.error("Error fetching patient data:", error);
@@ -281,6 +296,28 @@ export default function PatientDetailsPage() {
             alert("An error occurred during deletion. Some data may remain.");
         } finally {
             setIsDeletingPatient(false);
+        }
+    };
+
+    const handleUpdateMeetLink = async () => {
+        if (!user) return;
+        const link = meetLink.trim();
+        setSavingMeetLink(true);
+        try {
+            const linkDocId = `${user.id}_${patientId}`;
+            const linkRef = doc(db, 'session_links', linkDocId);
+            await setDoc(linkRef, {
+                therapistId: user.id,
+                clientId: patientId,
+                meetLink: link,
+                updatedAt: serverTimestamp(),
+            }, { merge: true });
+            setSavedMeetLink(link);
+        } catch (error) {
+            console.error('Error updating meet link:', error);
+            alert('Failed to save link. Please try again.');
+        } finally {
+            setSavingMeetLink(false);
         }
     };
 
@@ -508,6 +545,51 @@ export default function PatientDetailsPage() {
                                 </button>
                             </div>
                         )}
+
+                        {/* Session Link */}
+                        <div className="bg-white rounded-xl shadow-sm border border-[var(--neutral-200)] p-5">
+                            <h3 className="text-sm font-medium text-[var(--neutral-900)] mb-3 flex items-center gap-2">
+                                <Video className="w-4 h-4 text-[var(--primary-600)]" />
+                                Session Link
+                            </h3>
+                            <p className="text-xs text-[var(--neutral-500)] mb-3">
+                                Add a Google Meet link for sessions with this patient. They&apos;ll see it on their bookings page.
+                            </p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    placeholder="Paste Google Meet link..."
+                                    value={meetLink}
+                                    onChange={e => setMeetLink(e.target.value)}
+                                    className="flex-1 text-sm px-3 py-2 border border-[var(--neutral-200)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--primary-400)] bg-[var(--neutral-50)]"
+                                />
+                                <button
+                                    onClick={handleUpdateMeetLink}
+                                    disabled={savingMeetLink || meetLink.trim() === savedMeetLink}
+                                    className="px-3 py-2 bg-[var(--primary-100)] text-[var(--primary-700)] rounded-lg hover:bg-[var(--primary-200)] transition-colors disabled:opacity-50 text-sm font-medium"
+                                    title="Save link"
+                                >
+                                    {savingMeetLink ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : savedMeetLink ? (
+                                        <Check className="w-4 h-4" />
+                                    ) : (
+                                        'Save'
+                                    )}
+                                </button>
+                            </div>
+                            {savedMeetLink && (
+                                <a
+                                    href={savedMeetLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-xs text-[var(--secondary-600)] hover:text-[var(--secondary-700)] mt-2"
+                                >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Open current link
+                                </a>
+                            )}
+                        </div>
 
                         {/* Other Actions - Pushed down */}
                         <div className="bg-white rounded-xl shadow-sm border border-[var(--neutral-200)] p-5">
