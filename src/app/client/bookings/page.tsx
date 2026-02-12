@@ -86,6 +86,7 @@ export default function ClientBookingsPage() {
     const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [isRescheduling, setIsRescheduling] = useState(false);
+    const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
     const [meetLinks, setMeetLinks] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -230,7 +231,8 @@ export default function ClientBookingsPage() {
 
     const handleRescheduleClick = (booking: Booking) => {
         setRescheduleBooking(booking);
-        setSelectedDate(booking.sessionTime); // Start at the booking's current date
+        setSelectedDate(new Date(booking.sessionTime)); // Start at the booking's current date
+        setSelectedSlot(null); // Reset selected slot
     };
 
     const handleCancelBooking = async (bookingId: string) => {
@@ -450,7 +452,7 @@ export default function ClientBookingsPage() {
                             {/* Date Picker (Simplified) */}
                             <div className="flex items-center justify-between mb-6 bg-[var(--neutral-50)] p-3 rounded-xl">
                                 <button
-                                    onClick={() => setSelectedDate(d => new Date(d.setDate(d.getDate() - 1)))}
+                                    onClick={() => { setSelectedDate(d => { const nd = new Date(d); nd.setDate(nd.getDate() - 1); return nd; }); setSelectedSlot(null); }}
                                     className="p-1 hover:bg-white rounded-lg transition-colors"
                                 >
                                     ←
@@ -459,7 +461,7 @@ export default function ClientBookingsPage() {
                                     {format(selectedDate, 'EEE, MMM d')}
                                 </span>
                                 <button
-                                    onClick={() => setSelectedDate(d => new Date(d.setDate(d.getDate() + 1)))}
+                                    onClick={() => { setSelectedDate(d => { const nd = new Date(d); nd.setDate(nd.getDate() + 1); return nd; }); setSelectedSlot(null); }}
                                     className="p-1 hover:bg-white rounded-lg transition-colors"
                                 >
                                     →
@@ -476,21 +478,42 @@ export default function ClientBookingsPage() {
                                     No slots available on this date.
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                                    {availableSlots.map(slot => (
+                                <>
+                                    <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                                        {availableSlots.map(slot => (
+                                            <button
+                                                key={slot.time}
+                                                onClick={() => setSelectedSlot(slot.time)}
+                                                disabled={!slot.isAvailable || isRescheduling}
+                                                className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${!slot.isAvailable
+                                                    ? 'opacity-50 cursor-not-allowed bg-gray-100'
+                                                    : selectedSlot === slot.time
+                                                        ? 'bg-[var(--primary-600)] text-white ring-2 ring-[var(--primary-200)] shadow-md'
+                                                        : 'bg-[var(--neutral-50)] hover:bg-[var(--primary-50)] hover:text-[var(--primary-700)] border border-transparent hover:border-[var(--primary-200)]'
+                                                    }`}
+                                            >
+                                                {slot.time}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Confirm Reschedule Button */}
+                                    <div className="mt-4 flex gap-3">
                                         <button
-                                            key={slot.time}
-                                            onClick={() => handleConfirmReschedule(slot.time)}
-                                            disabled={!slot.isAvailable || isRescheduling}
-                                            className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${slot.isAvailable
-                                                ? 'bg-[var(--neutral-50)] hover:bg-[var(--primary-50)] hover:text-[var(--primary-700)] border border-transparent hover:border-[var(--primary-200)]'
-                                                : 'opacity-50 cursor-not-allowed bg-gray-100'
-                                                }`}
+                                            onClick={() => setRescheduleBooking(null)}
+                                            className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-[var(--neutral-100)] text-[var(--neutral-600)] hover:bg-[var(--neutral-200)] transition-colors"
                                         >
-                                            {isRescheduling ? '...' : slot.time}
+                                            Cancel
                                         </button>
-                                    ))}
-                                </div>
+                                        <button
+                                            onClick={() => selectedSlot && handleConfirmReschedule(selectedSlot)}
+                                            disabled={!selectedSlot || isRescheduling}
+                                            className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-[var(--primary-600)] text-white hover:bg-[var(--primary-700)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {isRescheduling ? 'Saving...' : 'Confirm Reschedule'}
+                                        </button>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </motion.div>
