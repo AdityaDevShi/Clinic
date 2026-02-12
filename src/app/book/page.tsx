@@ -43,6 +43,24 @@ function BookingContent() {
         }
     }, [authLoading, user, therapistId, router]);
 
+    // Block render entirely if not authenticated
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin" />
+            </div>
+        );
+    }
+    if (!user) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin mx-auto mb-4" />
+                    <p className="text-[var(--neutral-600)]">Redirecting to login...</p>
+                </div>
+            </div>
+        );
+    }
     // Fetch Therapist Data
     useEffect(() => {
         async function fetchTherapist() {
@@ -130,6 +148,10 @@ function BookingContent() {
 
     const handleConfirmBooking = async () => {
         if (!therapist) return;
+        if (!user) {
+            router.push(`/login?redirect=${encodeURIComponent(`/book?therapistId=${therapistId || ''}`)}`);
+            return;
+        }
         setIsSubmitting(true);
         try {
             // Create a booking for each selected slot
@@ -142,9 +164,9 @@ function BookingContent() {
                 return BookingService.createBooking({
                     therapistId: therapist.id,
                     therapistName: therapist.name,
-                    clientId: user?.id || 'guest-id',
-                    clientName: user?.name || 'Guest User',
-                    clientEmail: user?.email || 'guest@example.com',
+                    clientId: user.id,
+                    clientName: user.name || 'User',
+                    clientEmail: user.email || '',
                     sessionTime: sessionTime,
                     duration: 60, // Default duration
                     amount: therapist.hourlyRate || therapist.price || 2500,
