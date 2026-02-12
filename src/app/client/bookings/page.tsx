@@ -370,13 +370,20 @@ export default function ClientBookingsPage() {
                                                     </>
                                                 )}
                                                 {activeTab === 'past' && (booking.status === 'completed' || booking.status === 'confirmed') && (
-                                                    <Link
-                                                        href={`/client/feedback/${booking.id}`}
-                                                        className="btn btn-secondary py-2 px-4 text-sm flex items-center"
-                                                    >
-                                                        <Star className="w-4 h-4 mr-2" />
-                                                        Rate Session
-                                                    </Link>
+                                                    booking.isRated ? (
+                                                        <span className="px-3 py-1.5 rounded-lg bg-[var(--neutral-100)] text-[var(--neutral-500)] text-sm font-medium flex items-center">
+                                                            <Star className="w-4 h-4 mr-1.5 fill-[var(--neutral-400)] text-[var(--neutral-400)]" />
+                                                            Rated
+                                                        </span>
+                                                    ) : (
+                                                        <Link
+                                                            href={`/client/feedback/${booking.id}`}
+                                                            className="btn btn-secondary py-2 px-4 text-sm flex items-center"
+                                                        >
+                                                            <Star className="w-4 h-4 mr-2" />
+                                                            Rate Session
+                                                        </Link>
+                                                    )
                                                 )}
                                             </div>
                                         </div>

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { Phone, Mail, MapPin, Clock, Send, Loader2 } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Send, Loader2, Lock } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -22,6 +24,7 @@ const staggerContainer = {
 };
 
 export default function ContactPage() {
+    const { user, loading } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -32,16 +35,50 @@ export default function ContactPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
 
+    // Auto-fill email when user loads
+    useEffect(() => {
+        if (user) {
+            setFormData(prev => ({
+                ...prev,
+                name: user.name || '',
+                email: user.email || ''
+            }));
+        }
+    }, [user]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
-        // Simulate form submission
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        try {
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            });
 
-        setSubmitted(true);
-        setIsSubmitting(false);
-        setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send message');
+            }
+
+            setSubmitted(true);
+            // Don't clear name/email for logged in user
+            setFormData(prev => ({
+                ...prev,
+                phone: '',
+                subject: '',
+                message: ''
+            }));
+        } catch (error: any) {
+            console.error('Error sending message:', error);
+            alert(error.message || 'Failed to send message. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -102,29 +139,29 @@ export default function ContactPage() {
                             <motion.div variants={staggerContainer} className="space-y-6">
                                 <motion.a
                                     variants={fadeInUp}
-                                    href="tel:+919876543210"
+                                    href="tel:+917075829856"
                                     className="flex items-start space-x-4 group"
                                 >
-                                    <div className="w-12 h-12 bg-[var(--primary-50)] rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary-100)] transition-colors">
+                                    <div className="w-12 h-12 bg-[var(--primary-5)] rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary-100)] transition-colors">
                                         <Phone className="w-5 h-5 text-[var(--primary-600)]" />
                                     </div>
                                     <div>
                                         <h3 className="font-medium text-[var(--neutral-700)] mb-1">Phone</h3>
-                                        <p className="text-[var(--neutral-600)]">+91 98765 43210</p>
+                                        <p className="text-[var(--neutral-600)]">+91 7075829856</p>
                                     </div>
                                 </motion.a>
 
                                 <motion.a
                                     variants={fadeInUp}
-                                    href="mailto:info@arambhmentalhealth.com"
+                                    href="mailto:care@arambh.net"
                                     className="flex items-start space-x-4 group"
                                 >
-                                    <div className="w-12 h-12 bg-[var(--primary-50)] rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary-100)] transition-colors">
+                                    <div className="w-12 h-12 bg-[var(--primary-5)] rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary-100)] transition-colors">
                                         <Mail className="w-5 h-5 text-[var(--primary-600)]" />
                                     </div>
                                     <div>
                                         <h3 className="font-medium text-[var(--neutral-700)] mb-1">Email</h3>
-                                        <p className="text-[var(--neutral-600)]">info@arambhmentalhealth.com</p>
+                                        <p className="text-[var(--neutral-600)]">care@arambh.net</p>
                                     </div>
                                 </motion.a>
 
@@ -132,7 +169,7 @@ export default function ContactPage() {
                                     variants={fadeInUp}
                                     className="flex items-start space-x-4"
                                 >
-                                    <div className="w-12 h-12 bg-[var(--primary-50)] rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <div className="w-12 h-12 bg-[var(--primary-5)] rounded-xl flex items-center justify-center flex-shrink-0">
                                         <MapPin className="w-5 h-5 text-[var(--primary-600)]" />
                                     </div>
                                     <div>
@@ -151,7 +188,7 @@ export default function ContactPage() {
                                     variants={fadeInUp}
                                     className="flex items-start space-x-4"
                                 >
-                                    <div className="w-12 h-12 bg-[var(--primary-50)] rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <div className="w-12 h-12 bg-[var(--primary-5)] rounded-xl flex items-center justify-center flex-shrink-0">
                                         <Clock className="w-5 h-5 text-[var(--primary-600)]" />
                                     </div>
                                     <div>
@@ -178,7 +215,33 @@ export default function ContactPage() {
                                     Send Us a Message
                                 </h2>
 
-                                {submitted ? (
+                                {loading ? (
+                                    <div className="flex justify-center py-12">
+                                        <Loader2 className="w-8 h-8 text-[var(--primary-600)] animate-spin" />
+                                    </div>
+                                ) : !user ? (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="text-center py-12"
+                                    >
+                                        <div className="w-16 h-16 bg-[var(--primary-100)] rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Lock className="w-8 h-8 text-[var(--primary-600)]" />
+                                        </div>
+                                        <h3 className="font-serif text-xl text-[var(--primary-700)] mb-2">
+                                            Sign In Required
+                                        </h3>
+                                        <p className="text-[var(--neutral-600)] mb-6">
+                                            To prevent spam and ensure we can get back to you, please sign in to send a message.
+                                        </p>
+                                        <Link
+                                            href="/login?redirect=/contact"
+                                            className="btn btn-primary px-8 py-3"
+                                        >
+                                            Sign In to Contact
+                                        </Link>
+                                    </motion.div>
+                                ) : submitted ? (
                                     <motion.div
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
@@ -191,7 +254,7 @@ export default function ContactPage() {
                                             Message Sent!
                                         </h3>
                                         <p className="text-[var(--neutral-600)] mb-6">
-                                            Thank you for reaching out. We&apos;ll get back to you soon.
+                                            Thank you for reaching out, {user.name}. We&apos;ll get back to you soon at {user.email}.
                                         </p>
                                         <button
                                             onClick={() => setSubmitted(false)}
@@ -212,9 +275,11 @@ export default function ContactPage() {
                                                     type="text"
                                                     value={formData.name}
                                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                    className="input bg-white"
+                                                    className="input bg-[var(--neutral-100)] cursor-not-allowed"
                                                     placeholder="Your name"
                                                     required
+                                                    readOnly
+                                                    disabled
                                                 />
                                             </div>
                                             <div>
@@ -225,10 +290,13 @@ export default function ContactPage() {
                                                     id="email"
                                                     type="email"
                                                     value={formData.email}
-                                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                    className="input bg-white"
+                                                    // Locked: User cannot change this
+                                                    className="input bg-[var(--neutral-100)] cursor-not-allowed text-[var(--neutral-500)]"
                                                     placeholder="you@example.com"
                                                     required
+                                                    readOnly
+                                                    disabled
+                                                    title="You cannot change your registered email."
                                                 />
                                             </div>
                                         </div>
@@ -244,7 +312,7 @@ export default function ContactPage() {
                                                     value={formData.phone}
                                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                                     className="input bg-white"
-                                                    placeholder="+91 98765 43210"
+                                                    placeholder="+91 7075829856"
                                                 />
                                             </div>
                                             <div>
@@ -305,9 +373,9 @@ export default function ContactPage() {
                         </motion.div>
                     </div>
                 </div>
-            </section>
+            </section >
 
             <Footer />
-        </div>
+        </div >
     );
 }

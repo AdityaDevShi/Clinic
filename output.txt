@@ -1,0 +1,5 @@
+Status: 200
+Body: {
+  "success": true,
+  "message": "Message sent successfully"
+}

@@ -54,14 +54,33 @@ export default function TherapistsPage() {
         const unsubscribe = onSnapshot(
             q,
             (snapshot) => {
-                const fetchedTherapists: Therapist[] = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                    lastOnline: doc.data().lastOnline?.toDate() || new Date(),
-                })) as Therapist[];
+                const fetchedTherapists: Therapist[] = snapshot.docs
+                    .map((doc) => {
+                        try {
+                            const data = doc.data();
+                            console.log(`Therapist ${doc.id} photoUrl:`, data.photoUrl);
+                            return {
+                                id: doc.id,
+                                ...data,
+                                // Safe date handling to prevent crashes
+                                lastOnline: data.lastOnline?.toDate ? data.lastOnline.toDate() : new Date(),
+                            };
+                        } catch (err) {
+                            console.error(`Error processing therapist doc ${doc.id}:`, err);
+                            return null;
+                        }
+                    })
+                    // Filter out nulls and invalid/ghost accounts using strict checks
+                    .filter((t: any) =>
+                        t !== null &&
+                        typeof t.name === 'string' &&
+                        t.name.trim() !== '' &&
+                        typeof t.email === 'string' &&
+                        t.email.trim() !== ''
+                    ) as Therapist[];
 
-                // Sort client-side to avoid index issues with 'where' clause
-                fetchedTherapists.sort((a, b) => a.name.localeCompare(b.name));
+                // Sort client-side safely
+                fetchedTherapists.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
                 setAllTherapists(fetchedTherapists);
                 setLoading(false);
@@ -188,47 +207,64 @@ export default function TherapistsPage() {
                                 <motion.div
                                     key={therapist.id}
                                     variants={fadeInUp}
-                                    className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+                                    className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow border border-[var(--border)] flex flex-col items-center text-center h-full"
                                 >
                                     {/* Avatar */}
-                                    <div className="relative w-24 h-24 mx-auto mb-4">
-                                        <div className="w-full h-full bg-[var(--primary-100)] rounded-full flex items-center justify-center">
-                                            <span className="text-2xl font-serif text-[var(--primary-600)]">
-                                                {therapist.name.split(' ').map(n => n[0]).join('')}
-                                            </span>
+                                    <div className="relative w-24 h-24 mb-4">
+                                        <div className="w-full h-full bg-[var(--primary-100)] rounded-full flex items-center justify-center overflow-hidden">
+                                            {therapist.photoUrl ? (
+                                                <img src={therapist.photoUrl} alt={therapist.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-2xl font-serif text-[var(--primary-600)]">
+                                                    {(therapist.name || 'T').split(' ').map(n => n[0]).join('')}
+                                                </span>
+                                            )}
                                         </div>
-                                        {/* Online Status */}
-                                        <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white ${therapist.isOnline ? 'bg-green-500' : 'bg-[var(--neutral-300)]'
+                                        {/* Online Status Dot */}
+                                        <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white ${therapist.isOnline ? 'bg-green-500' : 'bg-gray-300'
                                             }`} />
                                     </div>
 
-                                    {/* Info */}
-                                    <div className="text-center mb-4">
-                                        <h3 className="font-serif text-xl text-[var(--primary-700)] mb-1">
-                                            {therapist.name}
-                                        </h3>
-                                        <p className="text-sm text-[var(--secondary-600)] font-medium mb-2">
-                                            {therapist.specialization}
-                                        </p>
-                                        <div className="flex items-center justify-center gap-1 text-sm text-[var(--neutral-500)]">
-                                            <span className={therapist.isOnline ? 'text-green-600' : ''}>
-                                                {therapist.isOnline ? 'Available Now' : 'Currently Offline'}
+                                    {/* Name & Specialization */}
+                                    <h3 className="font-serif text-xl text-[var(--primary-800)] mb-1">
+                                        {therapist.name}
+                                    </h3>
+                                    <p className="text-sm text-[var(--primary-600)] font-medium mb-1">
+                                        {therapist.specialization}
+                                    </p>
+
+                                    {/* Rating */}
+                                    {therapist.rating && therapist.rating > 0 ? (
+                                        <div className="flex items-center justify-center gap-1 mb-3">
+                                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                                            <span className="font-medium text-[var(--neutral-900)]">
+                                                {therapist.rating.toFixed(1)}
+                                            </span>
+                                            <span className="text-xs text-[var(--neutral-500)]">
+                                                ({therapist.reviewCount} reviews)
                                             </span>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="h-7 mb-3"></div>
+                                    )}
 
-                                    {/* Bio */}
-                                    <p className="text-sm text-[var(--neutral-600)] text-center mb-4 line-clamp-3">
-                                        {therapist.bio}
+                                    {/* Status Text */}
+                                    <p className={`text-xs font-medium mb-4 ${therapist.isOnline ? 'text-green-600' : 'text-gray-400'}`}>
+                                        {therapist.isOnline ? 'Available Now' : 'Currently Offline'}
+                                    </p>
+
+                                    {/* Bio Snippet */}
+                                    <p className="text-sm text-[var(--neutral-600)] mb-4 line-clamp-2 px-2">
+                                        {therapist.bio || "Welcome to my practice."}
                                     </p>
 
                                     {/* Languages */}
                                     {therapist.languages && (
-                                        <div className="flex flex-wrap justify-center gap-2 mb-4">
-                                            {therapist.languages.map((lang) => (
+                                        <div className="flex flex-wrap justify-center gap-2 mb-6 mt-auto">
+                                            {therapist.languages.slice(0, 3).map((lang) => (
                                                 <span
                                                     key={lang}
-                                                    className="text-xs px-2 py-1 bg-[var(--warm-100)] text-[var(--neutral-600)] rounded-full"
+                                                    className="text-xs px-3 py-1 bg-[var(--warm-100)] text-[var(--neutral-700)] rounded-full border border-[var(--warm-200)]"
                                                 >
                                                     {lang}
                                                 </span>
@@ -236,30 +272,27 @@ export default function TherapistsPage() {
                                         </div>
                                     )}
 
-                                    {/* Price & CTA */}
-                                    <div className="flex items-center justify-between pt-4 border-t border-[var(--border)]">
-                                        <div className="text-sm">
-                                            <span className="text-[var(--neutral-500)]">From </span>
-                                            <span className="font-semibold text-[var(--primary-700)]">
-                                                ₹{therapist.hourlyRate}
+                                    {/* Footer Section */}
+                                    <div className="w-full pt-4 border-t border-[var(--border)] mt-auto">
+                                        <div className="flex items-center justify-between mb-4 text-sm">
+                                            <span className="text-[var(--neutral-500)] font-medium">
+                                                From <span className="text-[var(--neutral-900)]">₹{therapist.hourlyRate}</span>/session
                                             </span>
-                                            <span className="text-[var(--neutral-500)]">/session</span>
+                                            <Link
+                                                href={`/profile?id=${therapist.id}`}
+                                                className="text-[var(--primary-700)] hover:text-[var(--primary-800)] font-medium inline-flex items-center gap-1 hover:underline"
+                                            >
+                                                View Profile <ArrowRight className="w-3 h-3" />
+                                            </Link>
                                         </div>
+
                                         <Link
-                                            href={`/therapists/${therapist.id}`}
-                                            className="inline-flex items-center text-sm text-[var(--secondary-600)] hover:text-[var(--secondary-700)] font-medium group"
+                                            href={`/book?therapistId=${therapist.id}`}
+                                            className="block w-full py-3 bg-[#4A5D4F] text-white text-center rounded-lg font-medium hover:bg-[#3A4D39] transition-colors shadow-sm"
                                         >
-                                            View Profile
-                                            <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                                            Book Appointment
                                         </Link>
                                     </div>
-
-                                    <Link
-                                        href={`/therapists/${therapist.id}/book`}
-                                        className="mt-4 block w-full py-2 bg-[var(--primary-600)] text-white text-center rounded-lg font-medium hover:bg-[var(--primary-700)] transition-colors shadow-sm"
-                                    >
-                                        Book Appointment
-                                    </Link>
                                 </motion.div>
                             ))}
                         </motion.div>

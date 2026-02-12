@@ -27,6 +27,21 @@ export interface Therapist {
     languages?: string[];
     rating?: number;
     reviewCount?: number;
+    // Enhanced Profile Fields
+    about?: string;
+    patientsHelped?: number;
+    research?: string;
+    recommendedFor?: string[];
+    recommendations?: string[];
+    testimonials?: { id: string; author: string; content: string; rating: number; }[]; // content fixed
+    certificates?: { id: string; title: string; url: string; }[];
+    referralLinks?: { name: string; url: string; }[];
+    therapyModes?: string[];
+    availabilitySummary?: string;
+    // Dynamic Scheduling Fields
+    workingHoursStart?: string; // "10:00"
+    workingHoursEnd?: string;   // "19:00"
+    lunchBreakStart?: string;   // "13:00"
 }
 
 // Therapist availability schedule
@@ -69,6 +84,7 @@ export interface Booking {
     serviceName?: string;
     createdAt: Date;
     notes?: string;
+    isRated?: boolean;
 }
 
 // Session notes by therapist

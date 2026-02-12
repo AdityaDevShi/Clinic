@@ -2,6 +2,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, addDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { Availability, Booking, TimeSlot, Feedback, Therapist } from '@/types';
 import { getDefaultAvailability, generateTimeSlotsForDate } from '@/lib/scheduling/availability';
+import { demoTherapists } from '@/lib/demoData';
 import { addDays, endOfDay, startOfDay } from 'date-fns';
 
 export const BookingService = {
@@ -70,7 +71,11 @@ export const BookingService = {
             // 1. Double check availability
             const start = bookingData.sessionTime!;
             const end = addDays(start, 0); // Same day check
-            const existingBookings = await this.getBookings(bookingData.therapistId!, startOfDay(start), endOfDay(end));
+
+            const [existingBookings, busySlots] = await Promise.all([
+                this.getBookings(bookingData.therapistId!, startOfDay(start), endOfDay(end)),
+                this.getBusySlots(bookingData.therapistId!, startOfDay(start), endOfDay(end))
+            ]);
 
             const isConflict = existingBookings.some(b => {
                 if (b.status === 'cancelled') return false;
@@ -78,8 +83,19 @@ export const BookingService = {
                 return bStart.getTime() === start.getTime(); // Exact match check for slot system
             });
 
-            if (isConflict) {
-                throw new Error("This slot was just booked by someone else. Please select another.");
+            // Check if slot is busy
+            const isBusy = busySlots.some(slot => {
+                const slotStart = slot.startTime.getTime();
+                const slotEnd = slot.endTime.getTime();
+                const bookingStart = start.getTime();
+                const bookingEnd = bookingStart + 60 * 60 * 1000; // 60 mins
+
+                // Overlap check
+                return bookingStart < slotEnd && bookingEnd > slotStart;
+            });
+
+            if (isConflict || isBusy) {
+                throw new Error("This slot is no longer available. Please select another.");
             }
 
             // 2. Save to Firestore
@@ -100,6 +116,34 @@ export const BookingService = {
     },
 
     /**
+     * Get busy slots for a date range
+     */
+    async getBusySlots(therapistId: string, start: Date, end: Date): Promise<any[]> {
+        if (!db) return [];
+
+        try {
+            const busySlotsRef = collection(db, 'busy_slots');
+            const q = query(
+                busySlotsRef,
+                where('therapistId', '==', therapistId),
+                where('startTime', '>=', Timestamp.fromDate(start)),
+                where('startTime', '<=', Timestamp.fromDate(end))
+            );
+
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                startTime: doc.data().startTime.toDate(),
+                endTime: doc.data().endTime.toDate(),
+            }));
+        } catch (error) {
+            console.error("Error fetching busy slots:", error);
+            return [];
+        }
+    },
+
+    /**
      * Get calculated slots for a specific date
      */
     async getAvailableSlots(therapistId: string, date: Date, excludeBookingId?: string): Promise<TimeSlot[]> {
@@ -109,16 +153,19 @@ export const BookingService = {
         // 2. Get Existing Bookings for the day
         const start = startOfDay(date);
         const end = endOfDay(date);
-        let bookings = await this.getBookings(therapistId, start, end);
+        const [bookings, busySlots] = await Promise.all([
+            this.getBookings(therapistId, start, end),
+            this.getBusySlots(therapistId, start, end)
+        ]);
 
         // Filter out the booking being rescheduled if ID is provided
+        let filteredBookings = bookings;
         if (excludeBookingId) {
-            bookings = bookings.filter(b => b.id !== excludeBookingId);
+            filteredBookings = bookings.filter(b => b.id !== excludeBookingId);
         }
 
         // 3. Generate Slots (this handles breaks, past times, and booking conflicts)
-        // We pass empty busySlots for now as that feature isn't fully built
-        return generateTimeSlotsForDate(date, availability, [], bookings);
+        return generateTimeSlotsForDate(date, availability, busySlots, filteredBookings);
     },
     /**
      * Submit feedback and update therapist rating
@@ -127,13 +174,26 @@ export const BookingService = {
         if (!db) throw new Error("Database not initialized");
 
         try {
-            // 1. Save Feedback
-            const feedbackRef = await addDoc(collection(db, 'feedback'), {
+            // 1. Check for Duplicate Feedback
+            const feedbackRef = collection(db, 'feedback');
+            const q = query(feedbackRef, where('bookingId', '==', feedbackData.bookingId));
+            const existing = await getDocs(q);
+
+            if (!existing.empty) {
+                throw new Error("You have already submitted feedback for this session.");
+            }
+
+            // 2. Save Feedback
+            await addDoc(collection(db, 'feedback'), {
                 ...feedbackData,
                 createdAt: Timestamp.now(),
             });
 
-            // 2. Update Therapist Rating
+            // 3. Mark Booking as Rated
+            const bookingRef = doc(db, 'bookings', feedbackData.bookingId);
+            await setDoc(bookingRef, { isRated: true }, { merge: true });
+
+            // 4. Update Therapist Rating
             const therapistRef = doc(db, 'therapists', feedbackData.therapistId);
             const therapistDoc = await getDoc(therapistRef);
 
@@ -150,6 +210,18 @@ export const BookingService = {
                     rating: parseFloat(newRating.toFixed(1)), // Round to 1 decimal
                     reviewCount: newCount
                 });
+            } else {
+                // Check if it's a demo therapist and hydrate if needed
+                const demoData = demoTherapists[feedbackData.therapistId];
+                if (demoData) {
+                    // Create the document with initial rating
+                    await setDoc(therapistRef, {
+                        ...demoData,
+                        rating: feedbackData.rating,
+                        reviewCount: 1,
+                        updatedAt: Timestamp.now()
+                    });
+                }
             }
 
         } catch (error) {
