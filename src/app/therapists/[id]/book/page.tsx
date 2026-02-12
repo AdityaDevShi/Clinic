@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function BookingPage() {
     const params = useParams();
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
 
     // New State for Frequency and Multiple Slots
@@ -32,6 +32,14 @@ export default function BookingPage() {
     // Hydration fix helper
     const [isClient, setIsClient] = useState(false);
     useEffect(() => { setIsClient(true) }, []);
+
+    // Auth guard: redirect to login if not signed in
+    useEffect(() => {
+        if (!authLoading && !user) {
+            const currentPath = `/therapists/${params.id}/book`;
+            router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+        }
+    }, [authLoading, user, params.id, router]);
 
     // Fetch Slots on date change
     useEffect(() => {

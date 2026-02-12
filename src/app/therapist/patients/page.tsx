@@ -9,7 +9,7 @@ import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Booking } from '@/types';
 import { format } from 'date-fns';
@@ -21,7 +21,8 @@ import {
     FileText,
     Search,
     Loader2,
-    XCircle
+    XCircle,
+    Trash2
 } from 'lucide-react';
 
 const fadeInUp = {
@@ -58,6 +59,7 @@ export default function TherapistPatientsPage() {
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [removingPatientId, setRemovingPatientId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -141,6 +143,55 @@ export default function TherapistPatientsPage() {
             email.toLowerCase().includes(term)
         );
     });
+
+    const handleRemovePatient = async (patient: Patient) => {
+        const confirmed = confirm(
+            `Are you sure you want to remove ${patient.name}?\n\nThis will:\n• Cancel all upcoming bookings\n• Delete session notes and attachments\n\nThis action cannot be undone.`
+        );
+        if (!confirmed || !user) return;
+
+        setRemovingPatientId(patient.id);
+        try {
+            // 1. Cancel all non-cancelled bookings for this patient with this therapist
+            const bookingsQuery = query(
+                collection(db, 'bookings'),
+                where('therapistId', '==', user.id),
+                where('clientId', '==', patient.id)
+            );
+            const bookingsDocs = await getDocs(bookingsQuery);
+            const cancelPromises = bookingsDocs.docs
+                .filter(d => d.data().status !== 'cancelled')
+                .map(d => updateDoc(doc(db, 'bookings', d.id), { status: 'cancelled' }));
+            await Promise.all(cancelPromises);
+
+            // 2. Delete patient notes
+            const notesQuery = query(
+                collection(db, 'patient_notes'),
+                where('therapistId', '==', user.id),
+                where('clientId', '==', patient.id)
+            );
+            const notesDocs = await getDocs(notesQuery);
+            await Promise.all(notesDocs.docs.map(d => deleteDoc(doc(db, 'patient_notes', d.id))));
+
+            // 3. Delete patient attachments
+            const attachQuery = query(
+                collection(db, 'patient_attachments'),
+                where('therapistId', '==', user.id),
+                where('clientId', '==', patient.id)
+            );
+            const attachDocs = await getDocs(attachQuery);
+            await Promise.all(attachDocs.docs.map(d => deleteDoc(doc(db, 'patient_attachments', d.id))));
+
+            // 4. Remove from local state
+            setPatients(prev => prev.filter(p => p.id !== patient.id));
+            alert(`${patient.name} has been removed.`);
+        } catch (error: any) {
+            console.error('Error removing patient:', error);
+            alert('Failed to remove patient: ' + (error.message || 'Unknown error'));
+        } finally {
+            setRemovingPatientId(null);
+        }
+    };
 
     if (authLoading || loading) {
         return (
@@ -253,13 +304,27 @@ export default function TherapistPatientsPage() {
                                                 )}
                                             </div>
 
-                                            <Link
-                                                href={`/therapist/patients/${patient.id}`}
-                                                className="btn btn-secondary py-2 px-4 text-sm flex items-center"
-                                            >
-                                                <FileText className="w-4 h-4 mr-2" />
-                                                View Notes
-                                            </Link>
+                                            <div className="flex items-center gap-2">
+                                                <Link
+                                                    href={`/therapist/patients/${patient.id}`}
+                                                    className="btn btn-secondary py-2 px-4 text-sm flex items-center"
+                                                >
+                                                    <FileText className="w-4 h-4 mr-2" />
+                                                    View Notes
+                                                </Link>
+                                                <button
+                                                    onClick={() => handleRemovePatient(patient)}
+                                                    disabled={removingPatientId === patient.id}
+                                                    className="py-2 px-3 text-sm flex items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                                    title="Remove patient"
+                                                >
+                                                    {removingPatientId === patient.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4" />
+                                                    )}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))

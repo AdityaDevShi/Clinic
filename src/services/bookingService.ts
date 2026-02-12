@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, addDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, addDoc, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { Availability, Booking, TimeSlot, Feedback, Therapist } from '@/types';
 import { getDefaultAvailability, generateTimeSlotsForDate } from '@/lib/scheduling/availability';
 import { demoTherapists } from '@/lib/demoData';
@@ -62,14 +62,111 @@ export const BookingService = {
     },
 
     /**
+     * Subscribe to bookings for real-time updates (Therapist View)
+     */
+    subscribeToTherapistBookings(therapistId: string, callback: (bookings: Booking[]) => void): () => void {
+        if (!db) return () => { };
+
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+            bookingsRef,
+            where('therapistId', '==', therapistId)
+        );
+
+        return onSnapshot(q, (snapshot) => {
+            const bookings = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    sessionTime: data.sessionTime.toDate(), // Convert Timestamp to Date
+                    createdAt: data.createdAt?.toDate(),
+                } as Booking;
+            });
+            callback(bookings);
+        }, (error) => {
+            console.error("Error subscribing to bookings:", error);
+        });
+    },
+
+    /**
+     * Subscribe to bookings for real-time updates (Client View)
+     */
+    subscribeToClientBookings(clientId: string, callback: (bookings: Booking[]) => void): () => void {
+        if (!db) return () => { };
+
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+            bookingsRef,
+            where('clientId', '==', clientId)
+        );
+
+        return onSnapshot(q, (snapshot) => {
+            const bookings = snapshot.docs.map(doc => {
+                const data = doc.data();
+                // Ensure proper data types
+                const sessionTime = data.sessionTime?.toDate ? data.sessionTime.toDate() : new Date(data.sessionTime);
+                const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+
+                return {
+                    id: doc.id,
+                    ...data,
+                    sessionTime,
+                    createdAt,
+                } as Booking;
+            });
+            callback(bookings);
+        }, (error) => {
+            console.error("Error subscribing to client bookings:", error);
+        });
+    },
+
+    /**
+     * Check if a client already has a booking on a specific date
+     */
+    async hasClientBookingOnDate(clientId: string, date: Date, excludeBookingId?: string): Promise<boolean> {
+        if (!db) return false;
+
+        const start = startOfDay(date);
+        const end = endOfDay(date);
+
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+            bookingsRef,
+            where('clientId', '==', clientId),
+            where('sessionTime', '>=', Timestamp.fromDate(start)),
+            where('sessionTime', '<=', Timestamp.fromDate(end))
+        );
+
+        const snapshot = await getDocs(q);
+
+        // Check if any booking exists that is NOT cancelled and NOT the excluded one
+        return snapshot.docs.some(doc => {
+            const data = doc.data();
+            if (data.status === 'cancelled') return false;
+            if (excludeBookingId && doc.id === excludeBookingId) return false;
+            return true;
+        });
+    },
+
+    /**
      * Create a new booking
      */
     async createBooking(bookingData: Partial<Booking>): Promise<string> {
         if (!db) throw new Error("Database not initialized");
 
         try {
-            // 1. Double check availability
             const start = bookingData.sessionTime!;
+
+            // 0. Check One-Session-Per-Day Rule
+            if (bookingData.clientId) {
+                const hasExisting = await this.hasClientBookingOnDate(bookingData.clientId, start);
+                if (hasExisting) {
+                    throw new Error("You already have a session scheduled for this day.");
+                }
+            }
+
+            // 1. Double check availability
             const end = addDays(start, 0); // Same day check
 
             const [existingBookings, busySlots] = await Promise.all([
@@ -237,7 +334,33 @@ export const BookingService = {
         if (!db) throw new Error("Database not initialized");
 
         try {
-            // 1. Check if new slot is available
+            // 0. Get Booking to find clientId and verify ownership/existence
+            const bookingRef = doc(db, 'bookings', bookingId);
+            const bookingDoc = await getDoc(bookingRef);
+
+            if (!bookingDoc.exists()) {
+                throw new Error("Booking not found");
+            }
+
+            const bookingData = bookingDoc.data();
+
+            // 1. Check One-Session-Per-Day Rule
+            if (bookingData.clientId) {
+                const hasExisting = await this.hasClientBookingOnDate(bookingData.clientId, newDate, bookingId);
+                // Note: We pass bookingId as excluded so we don't count the CURRENT booking (if rescheduling to same day different time)
+                // Wait. If rescheduling to SAME DAY, hasExisting returns true because of ITSELF?
+                // No, excludeBookingId ensures we don't count ourselves.
+                // BUT, if we have ANOTHER booking on that day, it returns true.
+                // If rescheduling to SAME DAY, and we only have THIS booking, result is FALSE (good).
+                // If rescheduling to SAME DAY, and we have ANOTHER booking, result is TRUE (error, preventing 2 sessions).
+                // If rescheduling to DIFFERENT DAY, and we have NO booking there, result is FALSE (good).
+
+                if (hasExisting) {
+                    throw new Error("You already have a session scheduled for this day.");
+                }
+            }
+
+            // 2. Check if new slot is available (Therapist Availability)
             const start = newDate;
             const end = addDays(start, 0);
             const existingBookings = await this.getBookings(therapistId, startOfDay(start), endOfDay(end));
@@ -252,11 +375,7 @@ export const BookingService = {
                 throw new Error("The selected slot is no longer available.");
             }
 
-            // 2. Update Booking
-            const bookingRef = doc(db, 'bookings', bookingId);
-
-            // We verify the booking exists and belongs to the user? (Security rule handles this usually, but good to check)
-            // For now, direct update.
+            // 3. Update Booking
             await setDoc(bookingRef, {
                 sessionTime: Timestamp.fromDate(newDate),
                 status: 'confirmed', // Re-confirm if it was cancelled? 

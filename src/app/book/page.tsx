@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 function BookingContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
 
     // Get therapistId from query param
     const therapistId = searchParams.get('therapistId');
@@ -34,6 +34,14 @@ function BookingContent() {
 
     const [isClient, setIsClient] = useState(false);
     useEffect(() => { setIsClient(true) }, []);
+
+    // Auth guard: redirect to login if not signed in
+    useEffect(() => {
+        if (!authLoading && !user) {
+            const currentPath = `/book?therapistId=${therapistId || ''}`;
+            router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+        }
+    }, [authLoading, user, therapistId, router]);
 
     // Fetch Therapist Data
     useEffect(() => {

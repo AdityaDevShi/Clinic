@@ -63,6 +63,7 @@ export default function TherapistDashboardPage() {
     const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
     // Fetch slots for rescheduling
     useEffect(() => {
@@ -103,7 +104,8 @@ export default function TherapistDashboardPage() {
 
     const handleRescheduleClick = (booking: Booking) => {
         setRescheduleBooking(booking);
-        setSelectedDate(booking.sessionTime);
+        setSelectedDate(new Date(booking.sessionTime));
+        setSelectedSlot(null);
     };
 
     const handleConfirmReschedule = async (time: string) => {
@@ -126,8 +128,42 @@ export default function TherapistDashboardPage() {
         }
     };
 
+    // 1. Profile Check Effect (Run once on mount or user change)
     useEffect(() => {
-        // Auth Check
+        if (!authLoading && user && user.role === 'therapist') {
+            const checkProfile = async () => {
+                try {
+                    const therapistRef = doc(db, 'therapists', user.id);
+                    const therapistSnap = await getDoc(therapistRef);
+
+                    if (!therapistSnap.exists()) {
+                        console.log('Creating missing therapist profile...');
+                        await setDoc(therapistRef, {
+                            name: user.name,
+                            email: user.email,
+                            specialization: 'General Psychologist', // Default
+                            bio: 'Welcome to my practice.',
+                            hourlyRate: 1500, // Default price
+                            isOnline: true,
+                            isEnabled: true,
+                            lastOnline: new Date(),
+                            rating: 5.0,
+                            reviewCount: 1,
+                            languages: ['English'],
+                            qualifications: ['Licensed Psychologist']
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error creating/checking profile:", error);
+                }
+            };
+            checkProfile();
+        }
+    }, [user, authLoading]);
+
+    // 2. Real-time Bookings Subscription
+    useEffect(() => {
+        // Auth Redirection Logic
         if (!authLoading) {
             if (!user) {
                 router.push('/login?redirect=/therapist/dashboard');
@@ -139,122 +175,78 @@ export default function TherapistDashboardPage() {
             }
         }
 
-        async function fetchData() {
-            if (!user) return;
+        if (!user || user.role !== 'therapist') return;
 
-            try {
-                // 1. Ensure Therapist Profile Exists (Auto-create if missing)
-                const therapistRef = doc(db, 'therapists', user.id);
-                const therapistSnap = await getDoc(therapistRef);
+        setLoading(true);
 
-                if (!therapistSnap.exists()) {
-                    console.log('Creating missing therapist profile...');
-                    await setDoc(therapistRef, {
-                        name: user.name,
-                        email: user.email,
-                        specialization: 'General Psychologist', // Default
-                        bio: 'Welcome to my practice.',
-                        hourlyRate: 1500, // Default price
-                        isOnline: true,
-                        isEnabled: true,
-                        lastOnline: new Date(),
-                        rating: 5.0,
-                        reviewCount: 1,
-                        languages: ['English'],
-                        qualifications: ['Licensed Psychologist']
-                    });
-                }
+        const therapistRef = doc(db, 'therapists', user.id);
+        let therapistHourlyRate = 1500;
 
-                // Fetch bookings for this therapist (Fetch ALL for accurate stats)
-                const bookingsQuery = query(
-                    collection(db, 'bookings'),
-                    where('therapistId', '==', user.id)
-                    // orderBy('sessionTime', 'desc') // Removed to avoid index requirement
-                );
-
-                const bookingsDocs = await getDocs(bookingsQuery);
-
-                if (!bookingsDocs.empty) {
-                    const bookings = bookingsDocs.docs.map((doc) => ({
-                        id: doc.id,
-                        ...doc.data(),
-                        sessionTime: doc.data().sessionTime?.toDate() || new Date(),
-                        createdAt: doc.data().createdAt?.toDate() || new Date(),
-                    })) as Booking[];
-
-                    // Sort client-side
-                    bookings.sort((a, b) => b.sessionTime.getTime() - a.sessionTime.getTime());
-
-                    // Calculate stats
-                    const now = new Date();
-                    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-                    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-                    // 1. Appointments Today (Remaining/Active)
-                    // Logic: Must be TODAY, and time must be in the FUTURE.
-                    const appointmentsToday = bookings.filter(b =>
-                        isSameDay(b.sessionTime, now) &&
-                        b.sessionTime > now &&
-                        (b.status === 'confirmed' || b.status === 'pending')
-                    ).length;
-
-                    // 2. Total Patients (Unique Client IDs)
-                    const uniquePatients = new Set(bookings.map(b => b.clientId));
-
-                    // Set recent bookings (Upcoming only)
-                    const upcomingBookingsList = bookings.filter(b =>
-                        b.sessionTime > now &&
-                        (b.status === 'confirmed' || b.status === 'pending')
-                    );
-                    setRecentBookings(upcomingBookingsList.slice(0, 5));
-
-                    // Filter bookings for this month
-                    const thisMonthBookings = bookings.filter(b =>
-                        b.sessionTime >= monthStart && b.sessionTime <= monthEnd
-                    );
-
-                    // 3. Earnings (Month) - Only count completed/paid
-                    // Fallback to current therapist rate if booking amount is missing (legacy data)
-                    const therapistRate = therapistSnap.data()?.hourlyRate || 1500;
-
-                    const earnings = thisMonthBookings.reduce((acc, curr) => {
-                        const amount = curr.amount || therapistRate;
-                        return ['paid', 'confirmed', 'completed'].includes(curr.status) ? acc + amount : acc;
-                    }, 0);
-
-                    // 4. Hours (Month) - Sum duration of COMPLETED sessions
-                    // "Hours should also work depending on the hours the therapist is online" -> Interpreted as Clinical Hours based on context of income/sessions
-                    // However, user said "depending on hours therapist is online". If they meant presence, we'd need a different tracking system.
-                    // Given the dashboard context "Hours (Month)", Clinical Hours is the standard metric. 
-                    // To support "online hours", we would need to track login/logout timestamps which is complex.
-                    // Implementing Clinical Hours (Billable Hours) as it aligns with "Income".
-                    const clinicalMinutes = thisMonthBookings.reduce((acc, curr) =>
-                        curr.status === 'completed' ? acc + (curr.duration || 60) : acc
-                        , 0);
-                    const hoursThisMonth = Math.round(clinicalMinutes / 60);
-
-                    setStats({
-                        appointmentsToday,
-                        totalPatients: uniquePatients.size,
-                        hoursThisMonth,
-                        earningsThisMonth: earnings
-                    });
-                }
-            } catch (error) {
-                console.error('Error fetching therapist data:', error);
-            } finally {
-                setLoading(false);
+        // Get rate once (could also be real-time but less critical)
+        getDoc(therapistRef).then(snap => {
+            if (snap.exists()) {
+                therapistHourlyRate = snap.data().hourlyRate || 1500;
             }
-        }
+        });
 
-        if (user && user.role === 'therapist') {
-            fetchData();
-        } else if (!authLoading && !user) {
-            // Handled by first auth check block
-        } else {
-            // If role is wrong, handled by first block, but we set loading false to show nothing/redirect
-            if (!authLoading) setLoading(false);
-        }
+        // Subscribe to Bookings
+        const unsubscribe = BookingService.subscribeToTherapistBookings(user.id, (bookings) => {
+            // Sort client-side
+            bookings.sort((a, b) => b.sessionTime.getTime() - a.sessionTime.getTime());
+
+            // Calculate stats
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+            // 1. Appointments Today (Remaining/Active)
+            const appointmentsToday = bookings.filter(b =>
+                isSameDay(b.sessionTime, now) &&
+                b.sessionTime > now &&
+                (b.status === 'confirmed' || b.status === 'pending')
+            ).length;
+
+            // 2. Total Patients (Unique Client IDs)
+            const uniquePatients = new Set(bookings.map(b => b.clientId));
+
+            // Set recent bookings (Upcoming only)
+            const upcomingBookingsList = bookings.filter(b =>
+                b.sessionTime > now &&
+                (b.status === 'confirmed' || b.status === 'pending')
+            );
+            // Since list is sorted desc (newest first), upcoming should be sorted asc (soonest first)
+            upcomingBookingsList.sort((a, b) => a.sessionTime.getTime() - b.sessionTime.getTime());
+
+            setRecentBookings(upcomingBookingsList.slice(0, 5));
+
+            // Filter bookings for this month
+            const thisMonthBookings = bookings.filter(b =>
+                b.sessionTime >= monthStart && b.sessionTime <= monthEnd
+            );
+
+            // 3. Earnings (Month)
+            const earnings = thisMonthBookings.reduce((acc, curr) => {
+                const amount = curr.amount || therapistHourlyRate;
+                return ['paid', 'confirmed', 'completed'].includes(curr.status) ? acc + amount : acc;
+            }, 0);
+
+            // 4. Hours (Month)
+            const clinicalMinutes = thisMonthBookings.reduce((acc, curr) =>
+                curr.status === 'completed' ? acc + (curr.duration || 60) : acc
+                , 0);
+            const hoursThisMonth = Math.round(clinicalMinutes / 60);
+
+            setStats({
+                appointmentsToday,
+                totalPatients: uniquePatients.size,
+                hoursThisMonth,
+                earningsThisMonth: earnings
+            });
+
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
 
     }, [user, authLoading, router]);
 
@@ -485,21 +477,42 @@ export default function TherapistDashboardPage() {
                                     No slots available on this date.
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                                    {availableSlots.map(slot => (
+                                <>
+                                    <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                                        {availableSlots.map(slot => (
+                                            <button
+                                                key={slot.time}
+                                                onClick={() => setSelectedSlot(slot.time)}
+                                                disabled={!slot.isAvailable || isProcessing}
+                                                className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${!slot.isAvailable
+                                                    ? 'opacity-50 cursor-not-allowed bg-gray-100'
+                                                    : selectedSlot === slot.time
+                                                        ? 'bg-[var(--primary-600)] text-white ring-2 ring-[var(--primary-200)] shadow-md'
+                                                        : 'bg-[var(--neutral-50)] hover:bg-[var(--primary-50)] hover:text-[var(--primary-700)] border border-transparent hover:border-[var(--primary-200)]'
+                                                    }`}
+                                            >
+                                                {slot.time}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Confirm Reschedule Button */}
+                                    <div className="mt-4 flex gap-3">
                                         <button
-                                            key={slot.time}
-                                            onClick={() => handleConfirmReschedule(slot.time)}
-                                            disabled={!slot.isAvailable || isProcessing}
-                                            className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${slot.isAvailable
-                                                ? 'bg-[var(--neutral-50)] hover:bg-[var(--primary-50)] hover:text-[var(--primary-700)] border border-transparent hover:border-[var(--primary-200)]'
-                                                : 'opacity-50 cursor-not-allowed bg-gray-100'
-                                                }`}
+                                            onClick={() => setRescheduleBooking(null)}
+                                            className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-[var(--neutral-100)] text-[var(--neutral-600)] hover:bg-[var(--neutral-200)] transition-colors"
                                         >
-                                            {isProcessing && slot.time === format(new Date(), 'HH:mm') ? '...' : slot.time}
+                                            Cancel
                                         </button>
-                                    ))}
-                                </div>
+                                        <button
+                                            onClick={() => selectedSlot && handleConfirmReschedule(selectedSlot)}
+                                            disabled={!selectedSlot || isProcessing}
+                                            className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-[var(--primary-600)] text-white hover:bg-[var(--primary-700)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {isProcessing ? 'Saving...' : 'Confirm Reschedule'}
+                                        </button>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </motion.div>
