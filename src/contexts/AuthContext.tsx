@@ -55,16 +55,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
+                        let role = userData.role as UserRole;
+
+                        // Self-healing: Ensure care@arambh.net is always admin
+                        if (firebaseUser.email === 'care@arambh.net' && role !== 'admin') {
+                            console.log('Auto-promoting care@arambh.net to admin...');
+                            await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' }, { merge: true });
+                            role = 'admin';
+                        }
+
                         setUser({
                             id: firebaseUser.uid,
                             email: firebaseUser.email || '',
                             name: userData.name || '',
-                            role: userData.role as UserRole,
+                            role: role,
                             createdAt: userData.createdAt?.toDate() || new Date(),
                             photoUrl: userData.photoUrl,
                         });
                     } else {
-                        setUser(null);
+                        // User exists in Auth but not in Firestore (restore missing doc)
+                        if (firebaseUser.email === 'care@arambh.net') {
+                            console.log('Restoring missing admin user doc...');
+                            const role = 'admin';
+                            await setDoc(doc(db, 'users', firebaseUser.uid), {
+                                email: firebaseUser.email,
+                                role,
+                                createdAt: serverTimestamp(),
+                            });
+                            setUser({
+                                id: firebaseUser.uid,
+                                email: firebaseUser.email || '',
+                                name: 'Administrator',
+                                role,
+                                createdAt: new Date()
+                            });
+                        } else {
+                            setUser(null);
+                        }
                     }
                 } catch (err) {
                     console.error('Error fetching user data:', err);
