@@ -164,27 +164,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const firebaseUser = userCredential.user;
             let role: UserRole = 'client';
 
-            // Check for pre-existing therapist invite
-            const therapistsRef = collection(db, 'therapists');
-            const q = query(therapistsRef, where('email', '==', email));
-            const querySnapshot = await getDocs(q);
+            // Auto-promote specific email to admin
+            if (email === 'care@arambh.net') {
+                role = 'admin';
+            } else {
+                // Check for pre-existing therapist invite
+                const therapistsRef = collection(db, 'therapists');
+                const q = query(therapistsRef, where('email', '==', email));
+                const querySnapshot = await getDocs(q);
 
-            if (!querySnapshot.empty) {
-                const inviteDoc = querySnapshot.docs[0];
-                const inviteData = inviteDoc.data();
+                if (!querySnapshot.empty) {
+                    const inviteDoc = querySnapshot.docs[0];
+                    const inviteData = inviteDoc.data();
 
-                console.log('Found therapist invite, linking account...');
-                role = 'therapist';
+                    console.log('Found therapist invite, linking account...');
+                    role = 'therapist';
 
-                // Migrate pre-filled data to the new Auth UID document
-                await setDoc(doc(db, 'therapists', firebaseUser.uid), {
-                    ...inviteData,
-                    id: firebaseUser.uid, // IMPORTANT: The doc ID must match Auth UID
-                    updatedAt: serverTimestamp()
-                });
+                    // Migrate pre-filled data to the new Auth UID document
+                    await setDoc(doc(db, 'therapists', firebaseUser.uid), {
+                        ...inviteData,
+                        id: firebaseUser.uid, // IMPORTANT: The doc ID must match Auth UID
+                        updatedAt: serverTimestamp()
+                    });
 
-                // Delete the temporary admin-created document
-                await deleteDoc(inviteDoc.ref);
+                    // Delete the temporary admin-created document
+                    await deleteDoc(inviteDoc.ref);
+                }
             }
 
             // Create user document in Firestore
