@@ -39,6 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            // Force logout for blocked admin
+            if (firebaseUser && firebaseUser.email === 'a@gmail.com') {
+                await signOut(auth);
+                setFirebaseUser(null);
+                setUser(null);
+                setLoading(false);
+                return;
+            }
+
             setFirebaseUser(firebaseUser);
 
             if (firebaseUser && db) {
@@ -128,6 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!auth) {
             throw new Error('Authentication not available');
         }
+
+        // Block old admin account
+        if (email === 'a@gmail.com') {
+            throw new Error('This account has been disabled. Please use the new admin email.');
+        }
+
         setError(null);
         setLoading(true);
         try {
