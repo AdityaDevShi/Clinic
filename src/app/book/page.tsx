@@ -43,24 +43,6 @@ function BookingContent() {
         }
     }, [authLoading, user, therapistId, router]);
 
-    // Block render entirely if not authenticated
-    if (authLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
-                <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin" />
-            </div>
-        );
-    }
-    if (!user) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin mx-auto mb-4" />
-                    <p className="text-[var(--neutral-600)]">Redirecting to login...</p>
-                </div>
-            </div>
-        );
-    }
     // Fetch Therapist Data
     useEffect(() => {
         async function fetchTherapist() {
@@ -71,12 +53,11 @@ function BookingContent() {
                 if (docSnap.exists()) {
                     setTherapist({ id: docSnap.id, ...docSnap.data() });
                 } else {
-                    // Fallback demo data logic if needed, or handle error
                     setTherapist({
                         id: therapistId,
                         name: 'Dr. Therapist',
                         specialization: 'Psychologist',
-                        price: 2500, // Default price fallback
+                        price: 2500,
                         hourlyRate: 2500
                     });
                 }
@@ -104,6 +85,25 @@ function BookingContent() {
 
         fetchSlots();
     }, [selectedDate, therapistId]);
+
+    // Block render entirely if not authenticated (MUST be after all hooks)
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin" />
+            </div>
+        );
+    }
+    if (!user) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin mx-auto mb-4" />
+                    <p className="text-[var(--neutral-600)]">Redirecting to login...</p>
+                </div>
+            </div>
+        );
+    }
 
 
     const handlePreviousDate = () => {
