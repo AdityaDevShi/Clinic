@@ -41,24 +41,6 @@ export default function BookingPage() {
         }
     }, [authLoading, user, params.id, router]);
 
-    // Block render entirely if not authenticated
-    if (authLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
-                <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin" />
-            </div>
-        );
-    }
-    if (!user) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin mx-auto mb-4" />
-                    <p className="text-[var(--neutral-600)]">Redirecting to login...</p>
-                </div>
-            </div>
-        );
-    }
     // Fetch Slots on date change
     useEffect(() => {
         const fetchSlots = async () => {
@@ -128,6 +110,25 @@ export default function BookingPage() {
     };
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Block render entirely if not authenticated (MUST be after all hooks)
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin" />
+            </div>
+        );
+    }
+    if (!user) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin mx-auto mb-4" />
+                    <p className="text-[var(--neutral-600)]">Redirecting to login...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleConfirmBooking = async () => {
         if (!user) {
