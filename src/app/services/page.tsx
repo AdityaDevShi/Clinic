@@ -11,7 +11,8 @@ import {
     ClipboardList,
     Clock,
     DollarSign,
-    ArrowRight
+    ArrowRight,
+    GraduationCap
 } from 'lucide-react';
 
 const fadeInUp = {
@@ -56,7 +57,6 @@ const services = [
             'CBT, DBT, ACT & Trauma Counseling',
             'Child, Adolescent & Play Therapy',
             'Family & Couples Counseling',
-            'Dementia Care & Stroke Rehab',
             'ADHD & Autism Interventions'
         ],
     },
@@ -73,6 +73,19 @@ const services = [
             'Case Documentation & Reporting',
             'Therapy Observations',
             'Certification Provided'
+        ],
+    },
+    {
+        id: 'tutorials',
+        icon: GraduationCap,
+        title: 'Psychology Tutorials & Lectures',
+        description: 'Personalized one-on-one academic guidance and lectures for psychology students and enthusiasts.',
+        duration: 'Varies',
+        price: 'Contact Us',
+        features: [
+            'One-on-One Explanations',
+            'Research Methodology',
+            'Clinical Concepts'
         ],
     },
 ];
