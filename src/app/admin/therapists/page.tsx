@@ -46,12 +46,12 @@ const demoTherapists: Therapist[] = [
         name: 'Dr. Shiwani Kohli',
         email: 'shiwani@arambhmentalhealth.com',
         specialization: 'Clinical Psychology',
-        bio: 'RCI Registered Clinical Psychologist with expertise in anxiety, depression, and trauma therapy.',
+        bio: 'Clinical Psychologist with expertise in anxiety, depression, and trauma therapy.',
         isOnline: true,
         isEnabled: true,
         hourlyRate: 2500,
         lastOnline: new Date(),
-        qualifications: ['M.Phil Clinical Psychology', 'RCI Registered'],
+        qualifications: ['M.Phil Clinical Psychology'],
         languages: ['English', 'Hindi'],
     },
     {
@@ -485,7 +485,7 @@ export default function AdminTherapistsPage() {
                                     value={formData.qualifications}
                                     onChange={(e) => setFormData({ ...formData, qualifications: e.target.value })}
                                     className="input"
-                                    placeholder="M.Phil Psychology, RCI Registered"
+                                    placeholder="M.Phil Psychology"
                                 />
                             </div>
 

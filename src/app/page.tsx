@@ -62,7 +62,7 @@ const whyChooseUs = [
   {
     icon: Award,
     title: 'Experienced Care',
-    description: 'RCI Licensed Clinical Psychologist.',
+    description: 'Licensed Clinical Psychologist.',
   },
   {
     icon: Shield,
@@ -153,8 +153,7 @@ export default function HomePage() {
               className="text-[var(--neutral-600)] leading-relaxed text-lg"
             >
               Welcome to <strong className="text-[var(--primary-600)]">Arambh Mental Health Centre</strong>.
-              Led by RCI Registered Clinical Psychologist, <strong className="text-[var(--primary-600)]">Shiwani Kohli</strong>
-              {' '}(RCI Reg. No. A12945), we provide compassionate and confidential psychological support
+              Led by Registered Clinical Psychologist, <strong className="text-[var(--primary-600)]">Shiwani Kohli</strong>, we provide compassionate and confidential psychological support
               to help individuals find clarity and emotional balance.
             </motion.p>
           </motion.div>

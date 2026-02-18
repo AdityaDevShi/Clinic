@@ -115,8 +115,8 @@ export default function AboutPage() {
                             </p>
 
                             <p className="leading-relaxed">
-                                Led by <strong className="text-[var(--primary-600)]">Shiwani Kohli</strong>, an RCI Registered
-                                Clinical Psychologist (RCI Reg. No. A12945), our team brings together expertise, compassion,
+                                Led by <strong className="text-[var(--primary-600)]">Shiwani Kohli</strong>, a
+                                Clinical Psychologist, our team brings together expertise, compassion,
                                 and a deep commitment to your well-being. We combine evidence-based therapeutic approaches
                                 with a holistic understanding of mental health to provide personalized care that truly makes
                                 a difference.
@@ -203,10 +203,7 @@ export default function AboutPage() {
                                 Shiwani Kohli
                             </h3>
                             <p className="text-[var(--secondary-600)] font-medium mb-4">
-                                RCI Registered Clinical Psychologist
-                            </p>
-                            <p className="text-sm text-[var(--neutral-500)] mb-6">
-                                RCI Reg. No. A12945
+                                Clinical Psychologist
                             </p>
 
                             <p className="text-[var(--neutral-600)] leading-relaxed max-w-2xl mx-auto">
