@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -25,7 +25,8 @@ import {
     Loader2,
     Settings,
     FileText,
-    MessageCircle
+    MessageCircle,
+    Megaphone
 } from 'lucide-react';
 
 const fadeInUp = {
@@ -43,93 +44,26 @@ const staggerContainer = {
     }
 };
 
-// Demo data
-const demoStats = {
-    totalBookings: 156,
-    thisWeekBookings: 24,
-    totalClients: 89,
-    totalTherapists: 5,
-    totalRevenue: 345000,
-    avgRating: 4.8,
+// Initial empty data
+const initialStats = {
+    totalBookings: 0,
+    thisWeekBookings: 0,
+    totalClients: 0,
+    totalTherapists: 0,
+    totalRevenue: 0,
+    avgRating: 0,
 };
 
-const demoRecentBookings: Booking[] = [
-    {
-        id: 'ab1',
-        clientId: 'c1',
-        clientName: 'Rahul Sharma',
-        clientEmail: 'rahul@example.com',
-        therapistId: '1',
-        therapistName: 'Dr. Shiwani Kohli',
-        sessionTime: new Date(Date.now() + 3600000 * 2),
-        duration: 60,
-        status: 'confirmed',
-        paymentStatus: 'paid',
-        amount: 2500,
-        createdAt: new Date(Date.now() - 86400000),
-    },
-    {
-        id: 'ab2',
-        clientId: 'c2',
-        clientName: 'Priya Gupta',
-        clientEmail: 'priya@example.com',
-        therapistId: '2',
-        therapistName: 'Dr. Priya Sharma',
-        sessionTime: new Date(Date.now() + 86400000),
-        duration: 60,
-        status: 'confirmed',
-        paymentStatus: 'paid',
-        amount: 2000,
-        createdAt: new Date(Date.now() - 86400000 * 2),
-    },
-    {
-        id: 'ab3',
-        clientId: 'c3',
-        clientName: 'Amit Verma',
-        clientEmail: 'amit@example.com',
-        therapistId: '3',
-        therapistName: 'Dr. Rahul Verma',
-        sessionTime: new Date(Date.now() - 86400000),
-        duration: 60,
-        status: 'completed',
-        paymentStatus: 'paid',
-        amount: 3500,
-        createdAt: new Date(Date.now() - 86400000 * 3),
-    },
-];
-
-const demoRecentFeedback: Feedback[] = [
-    {
-        id: 'af1',
-        bookingId: 'ab3',
-        clientId: 'c3',
-        clientName: 'Anonymous',
-        therapistId: '1',
-        rating: 5,
-        comment: 'Excellent session! Dr. Kohli was very understanding and professional.',
-        createdAt: new Date(Date.now() - 86400000),
-        isPublic: true,
-    },
-    {
-        id: 'af2',
-        bookingId: 'ab4',
-        clientId: 'c4',
-        clientName: 'Anonymous',
-        therapistId: '2',
-        rating: 4,
-        comment: 'Great experience with my child\'s therapy session.',
-        createdAt: new Date(Date.now() - 86400000 * 2),
-        isPublic: true,
-    },
-];
+const initialRecentBookings: Booking[] = [];
+const initialRecentFeedback: Feedback[] = [];
 
 export default function AdminDashboardPage() {
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
 
-    const [stats, setStats] = useState(demoStats);
-    const [recentBookings, setRecentBookings] = useState<Booking[]>(demoRecentBookings);
-    const [recentFeedback, setRecentFeedback] = useState<Feedback[]>(demoRecentFeedback);
+    const [stats, setStats] = useState(initialStats);
+    const [recentBookings, setRecentBookings] = useState<Booking[]>(initialRecentBookings);
+    const [recentFeedback, setRecentFeedback] = useState<Feedback[]>(initialRecentFeedback);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -283,7 +217,7 @@ export default function AdminDashboardPage() {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <div className="max-w-7xl mx-auto">
@@ -368,9 +302,9 @@ export default function AdminDashboardPage() {
                                 <MessageCircle className="w-5 h-5 text-[var(--primary-600)]" />
                                 <span className="text-[var(--neutral-700)] font-medium">Feedback</span>
                             </Link>
-                            <Link href="/admin/settings" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3">
-                                <Settings className="w-5 h-5 text-[var(--primary-600)]" />
-                                <span className="text-[var(--neutral-700)] font-medium">Settings</span>
+                            <Link href="/admin/workshops" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3">
+                                <Megaphone className="w-5 h-5 text-[var(--primary-600)]" />
+                                <span className="text-[var(--neutral-700)] font-medium">Workshops</span>
                             </Link>
                         </motion.div>
 
@@ -389,19 +323,25 @@ export default function AdminDashboardPage() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    {recentBookings.slice(0, 4).map((booking) => (
-                                        <div key={booking.id} className="flex items-center justify-between py-3 border-b border-[var(--border)] last:border-0">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-[var(--neutral-700)] truncate">{booking.clientName}</p>
-                                                <p className="text-sm text-[var(--neutral-500)]">
-                                                    {booking.therapistName} • {format(booking.sessionTime, 'MMM d, h:mm a')}
-                                                </p>
+                                    {recentBookings.length > 0 ? (
+                                        recentBookings.slice(0, 4).map((booking) => (
+                                            <div key={booking.id} className="flex items-center justify-between py-3 border-b border-[var(--border)] last:border-0">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-[var(--neutral-700)] truncate">{booking.clientName}</p>
+                                                    <p className="text-sm text-[var(--neutral-500)]">
+                                                        {booking.therapistName} • {format(booking.sessionTime, 'MMM d, h:mm a')}
+                                                    </p>
+                                                </div>
+                                                <div className="ml-4">
+                                                    {getStatusBadge(booking)}
+                                                </div>
                                             </div>
-                                            <div className="ml-4">
-                                                {getStatusBadge(booking)}
-                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-6 text-[var(--neutral-500)] text-sm">
+                                            No recent bookings found.
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </motion.div>
 
@@ -418,28 +358,34 @@ export default function AdminDashboardPage() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    {recentFeedback.slice(0, 3).map((feedback) => (
-                                        <div key={feedback.id} className="p-4 bg-[var(--warm-50)] rounded-xl">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center">
-                                                    {[1, 2, 3, 4, 5].map((star) => (
-                                                        <Star
-                                                            key={star}
-                                                            className={`w-4 h-4 ${star <= feedback.rating ? 'text-yellow-400 fill-yellow-400' : 'text-[var(--neutral-300)]'}`}
-                                                        />
-                                                    ))}
+                                    {recentFeedback.length > 0 ? (
+                                        recentFeedback.slice(0, 3).map((feedback) => (
+                                            <div key={feedback.id} className="p-4 bg-[var(--warm-50)] rounded-xl">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center">
+                                                        {[1, 2, 3, 4, 5].map((star) => (
+                                                            <Star
+                                                                key={star}
+                                                                className={`w-4 h-4 ${star <= feedback.rating ? 'text-yellow-400 fill-yellow-400' : 'text-[var(--neutral-300)]'}`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-xs text-[var(--neutral-500)]">
+                                                        {format(feedback.createdAt, 'MMM d')}
+                                                    </span>
                                                 </div>
-                                                <span className="text-xs text-[var(--neutral-500)]">
-                                                    {format(feedback.createdAt, 'MMM d')}
-                                                </span>
+                                                {feedback.comment && (
+                                                    <p className="text-sm text-[var(--neutral-600)] line-clamp-2">
+                                                        &ldquo;{feedback.comment}&rdquo;
+                                                    </p>
+                                                )}
                                             </div>
-                                            {feedback.comment && (
-                                                <p className="text-sm text-[var(--neutral-600)] line-clamp-2">
-                                                    &ldquo;{feedback.comment}&rdquo;
-                                                </p>
-                                            )}
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-6 text-[var(--neutral-500)] text-sm">
+                                            No recent feedback found.
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </motion.div>
                         </div>
@@ -447,7 +393,7 @@ export default function AdminDashboardPage() {
                 </div>
             </main>
 
-            <Footer />
+
         </div>
     );
 }

@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -140,7 +140,7 @@ export default function FeedbackPage() {
     if (submitted) {
         return (
             <div className="min-h-screen flex flex-col">
-                <Header />
+
                 <main className="flex-1 flex items-center justify-center py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -173,14 +173,14 @@ export default function FeedbackPage() {
                         </div>
                     </motion.div>
                 </main>
-                <Footer />
+
             </div>
         );
     }
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <div className="max-w-xl mx-auto">
@@ -290,7 +290,7 @@ export default function FeedbackPage() {
                 </div>
             </main>
 
-            <Footer />
+
         </div>
     );
 }

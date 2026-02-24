@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { Phone, Mail, MapPin, Clock, Send, Loader2, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -83,7 +83,7 @@ export default function ContactPage() {
 
     return (
         <div className="min-h-screen">
-            <Header />
+
 
             {/* Hero Section */}
             <section className="pt-24 md:pt-32 pb-12 md:pb-16 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
@@ -374,7 +374,7 @@ export default function ContactPage() {
                 </div>
             </section >
 
-            <Footer />
+
         </div >
     );
 }

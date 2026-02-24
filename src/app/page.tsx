@@ -3,8 +3,6 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import {
   User,
   Users,
@@ -79,7 +77,6 @@ const whyChooseUs = [
 export default function HomePage() {
   return (
     <div className="min-h-screen">
-      <Header />
 
       {/* Hero Section */}
       <section className="relative pt-20 md:pt-24 min-h-[85vh] flex items-center overflow-hidden">
@@ -112,7 +109,7 @@ export default function HomePage() {
               variants={fadeInUp}
               className="text-lg md:text-xl text-[var(--neutral-600)] mb-8 italic"
             >
-              A New Beginning for Your Mind
+              A Beginning of Your Becoming
             </motion.p>
 
             <motion.div variants={fadeInUp}>
@@ -492,7 +489,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <Footer />
     </div>
   );
 }

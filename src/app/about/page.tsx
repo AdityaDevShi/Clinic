@@ -1,8 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { Award, Heart, Shield, Users, BookOpen, Target } from 'lucide-react';
 
 const fadeInUp = {
@@ -56,7 +56,7 @@ const values = [
 export default function AboutPage() {
     return (
         <div className="min-h-screen">
-            <Header />
+
 
             {/* Hero Section */}
             <section className="pt-24 md:pt-32 pb-16 md:pb-20 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
@@ -217,7 +217,7 @@ export default function AboutPage() {
                 </div>
             </section>
 
-            <Footer />
+
         </div>
     );
 }

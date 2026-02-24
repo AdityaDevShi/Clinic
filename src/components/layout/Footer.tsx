@@ -121,9 +121,17 @@ export default function Footer() {
                         <p className="text-[var(--primary-300)] text-sm text-center md:text-left">
                             © {new Date().getFullYear()} Arambh Mental Health Centre. All Rights Reserved.
                         </p>
-                        <p className="text-[var(--primary-300)] text-sm flex items-center">
-                            Professional <span className="mx-2">|</span> Ethical <span className="mx-2">|</span> Confidential
-                        </p>
+                        <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-6 gap-y-2 mt-4 md:mt-0">
+                            <Link href="/privacy-policy" className="text-[var(--primary-300)] hover:text-white text-sm transition-colors">
+                                Privacy Policy
+                            </Link>
+                            <Link href="/terms-and-conditions" className="text-[var(--primary-300)] hover:text-white text-sm transition-colors">
+                                Terms & Conditions
+                            </Link>
+                            <Link href="/refund-cancellation-policy" className="text-[var(--primary-300)] hover:text-white text-sm transition-colors">
+                                Refund Policy
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -6,8 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { Loader2, Upload, Plus, Trash2, Save, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -43,9 +43,11 @@ export default function EditProfilePage() {
         recommendedFor: [] as string[],
         therapyModes: [] as string[],
         referralLinks: [] as { name: string; url: string }[],
+        mediaMentions: [] as { id: string; title: string; url: string; publisher: string; date: string; }[],
         testimonials: [] as { id: string; author: string; content: string; rating: number }[],
         certificates: [] as { id: string; title: string; url: string }[],
         photoUrl: '',
+        sessionDuration: '50-60 Minutes',
         workingHoursStart: '10:30',
         workingHoursEnd: '19:00',
         lunchBreakStart: '13:00'
@@ -236,7 +238,7 @@ export default function EditProfilePage() {
 
     return (
         <div className="min-h-screen bg-[var(--warm-50)]">
-            <Header />
+
             <div className="max-w-4xl mx-auto px-4 py-8 pt-24">
 
                 <div className="flex justify-between items-center mb-8">
@@ -526,6 +528,21 @@ export default function EditProfilePage() {
                                 />
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-1">Session Duration</label>
+                                <select
+                                    value={formData.sessionDuration}
+                                    onChange={e => setFormData({ ...formData, sessionDuration: e.target.value })}
+                                    className="input w-full"
+                                >
+                                    <option value="30 Minutes">30 Minutes</option>
+                                    <option value="45 Minutes">45 Minutes</option>
+                                    <option value="50-60 Minutes">50-60 Minutes</option>
+                                    <option value="60 Minutes">60 Minutes</option>
+                                    <option value="90 Minutes">90 Minutes</option>
+                                </select>
+                            </div>
+
                             <div className="border-t border-[var(--neutral-200)] pt-4 mt-4">
                                 <h3 className="text-md font-medium text-[var(--primary-800)] mb-3">Working Hours (Mon-Sat)</h3>
                                 <div className="grid grid-cols-3 gap-4">
@@ -760,9 +777,91 @@ export default function EditProfilePage() {
                         </div>
                     </div>
 
+                    {/* 9. Media Mentions / News */}
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-[var(--border)]">
+                        <h2 className="text-xl font-serif text-[var(--primary-700)] mb-4">In the Media (News & Articles)</h2>
+                        <div className="space-y-4">
+                            {(formData.mediaMentions || []).map((mention, idx) => (
+                                <div key={idx} className="bg-[var(--warm-50)] p-4 rounded-lg relative group space-y-3">
+                                    <button
+                                        onClick={() => removeArrayItem('mediaMentions', idx)}
+                                        className="absolute top-2 right-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 rounded"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={mention.title}
+                                                onChange={e => {
+                                                    const newM = [...(formData.mediaMentions || [])];
+                                                    newM[idx].title = e.target.value;
+                                                    setFormData({ ...formData, mediaMentions: newM });
+                                                }}
+                                                className="input w-full text-sm"
+                                                placeholder="Article Title"
+                                            />
+                                        </div>
+                                        <div className="w-1/3">
+                                            <input
+                                                type="text"
+                                                value={mention.publisher}
+                                                onChange={e => {
+                                                    const newM = [...(formData.mediaMentions || [])];
+                                                    newM[idx].publisher = e.target.value;
+                                                    setFormData({ ...formData, mediaMentions: newM });
+                                                }}
+                                                className="input w-full text-sm"
+                                                placeholder="Publisher (e.g. Times of India)"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={mention.url}
+                                                onChange={e => {
+                                                    const newM = [...(formData.mediaMentions || [])];
+                                                    newM[idx].url = e.target.value;
+                                                    setFormData({ ...formData, mediaMentions: newM });
+                                                }}
+                                                className="input w-full text-sm"
+                                                placeholder="URL (Link to article)"
+                                            />
+                                        </div>
+                                        <div className="w-1/3">
+                                            <input
+                                                type="text"
+                                                value={mention.date}
+                                                onChange={e => {
+                                                    const newM = [...(formData.mediaMentions || [])];
+                                                    newM[idx].date = e.target.value;
+                                                    setFormData({ ...formData, mediaMentions: newM });
+                                                }}
+                                                className="input w-full text-sm"
+                                                placeholder="Date (e.g. Jan 2024)"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            <button
+                                onClick={() => setFormData({
+                                    ...formData,
+                                    mediaMentions: [...(formData.mediaMentions || []), { id: Date.now().toString(), title: '', url: '', publisher: '', date: '' }]
+                                })}
+                                className="text-sm text-[var(--primary-600)] font-medium hover:underline flex items-center gap-1"
+                            >
+                                <Plus className="w-4 h-4" /> Add Article
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-            <Footer />
+
         </div>
     );
 }

@@ -1,6 +1,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import firebaseConfig from './config';
 
 // Server-side initialization (Node.js runtime for API routes)
@@ -8,3 +9,4 @@ import firebaseConfig from './config';
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
+export const rtdb = getDatabase(app);

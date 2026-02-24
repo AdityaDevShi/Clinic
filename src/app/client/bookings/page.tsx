@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -40,37 +40,7 @@ const staggerContainer = {
     }
 };
 
-// Demo bookings
-const demoBookings: Booking[] = [
-    {
-        id: 'demo1',
-        clientId: 'demo',
-        clientName: 'Demo User',
-        clientEmail: 'demo@example.com',
-        therapistId: '1',
-        therapistName: 'Dr. Shiwani Kohli',
-        sessionTime: new Date(Date.now() + 86400000 * 2), // 2 days from now
-        duration: 60,
-        status: 'confirmed',
-        paymentStatus: 'paid',
-        amount: 2500,
-        createdAt: new Date(),
-    },
-    {
-        id: 'demo2',
-        clientId: 'demo',
-        clientName: 'Demo User',
-        clientEmail: 'demo@example.com',
-        therapistId: '2',
-        therapistName: 'Dr. Priya Sharma',
-        sessionTime: new Date(Date.now() - 86400000 * 7), // 7 days ago
-        duration: 60,
-        status: 'completed',
-        paymentStatus: 'paid',
-        amount: 2000,
-        createdAt: new Date(Date.now() - 86400000 * 14),
-    },
-];
+
 
 export default function ClientBookingsPage() {
     const router = useRouter();
@@ -268,7 +238,7 @@ export default function ClientBookingsPage() {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <div className="max-w-4xl mx-auto">
@@ -520,7 +490,7 @@ export default function ClientBookingsPage() {
                 </div>
             )}
 
-            <Footer />
+
         </div>
     );
 }

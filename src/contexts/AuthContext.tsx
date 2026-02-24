@@ -8,9 +8,10 @@ import {
     signOut,
     onAuthStateChanged,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, deleteDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserRole } from '@/types';
+import { differenceInMinutes } from 'date-fns';
 
 interface AuthContextType {
     user: User | null;
@@ -24,6 +25,64 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Track active presence interval to avoid duplicates
+let heartbeatInterval: NodeJS.Timeout | null = null;
+let currentTherapistId: string | null = null;
+
+const handlePageHide = () => {
+    if (currentTherapistId) {
+        try {
+            // We include the exact time the tab was closed/navigated away
+            const data = JSON.stringify({ therapistId: currentTherapistId, beaconTime: Date.now() });
+            navigator.sendBeacon('/api/presence/offline', data);
+        } catch (e) {
+            console.error('sendBeacon failed:', e);
+        }
+    }
+};
+
+/**
+ * Starts a periodic heartbeat to the server API to maintain online presence.
+ */
+function startHeartbeat(therapistId: string) {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+    }
+    currentTherapistId = therapistId;
+
+    // Send immediately on login
+    sendHeartbeat(therapistId);
+
+    // Then ping every 30 seconds
+    heartbeatInterval = setInterval(() => {
+        if (currentTherapistId === therapistId) {
+            sendHeartbeat(therapistId);
+        }
+    }, 30000);
+
+    // Only trigger offline when the user actually unloads the document or navigates away.
+    // 'pagehide' is the recommended modern event for this instead of 'unload' or 'visibilitychange'.
+    window.addEventListener('pagehide', handlePageHide);
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
+    currentTherapistId = null;
+    window.removeEventListener('pagehide', handlePageHide);
+}
+
+function sendHeartbeat(therapistId: string) {
+    fetch('/api/presence/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistId }),
+        keepalive: true
+    }).catch((e) => console.error('Heartbeat failed:', e));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -42,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Force logout for blocked admin
             if (firebaseUser && firebaseUser.email === 'a@gmail.com') {
                 await signOut(auth);
+                stopHeartbeat();
                 setFirebaseUser(null);
                 setUser(null);
                 setLoading(false);
@@ -64,14 +124,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             role = 'admin';
                         }
 
-                        setUser({
+                        const resolvedUser: User = {
                             id: firebaseUser.uid,
                             email: firebaseUser.email || '',
                             name: userData.name || '',
                             role: role,
                             createdAt: userData.createdAt?.toDate() || new Date(),
                             photoUrl: userData.photoUrl,
-                        });
+                        };
+                        setUser(resolvedUser);
+
+                        // Start sending heartbeats to API
+                        if (role === 'therapist') {
+                            startHeartbeat(firebaseUser.uid);
+                        }
                     } else {
                         // User exists in Auth but not in Firestore (restore missing doc)
                         if (firebaseUser.email === 'care@arambh.net') {
@@ -104,60 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
         });
 
-        // Presence System
-        const handlePresence = async (isOffline: boolean) => {
-            if (auth.currentUser && db) {
-                const uid = auth.currentUser.uid;
-                // Only a best-effort check since we can't easily access 'user' role synchronously in unmount.
-                // We rely on the fact that 'therapists' collection only contains therapists.
-                // If a client ID is passed, it might create a doc in therapists collection if we aren't careful,
-                // but our security rules or previous logic should assume only existing docs are updated?
-                // Actually, setDoc with merge will create if not exists.
-                // To be safe, we should only do this if we know they are a therapist.
-                // But inside this useEffect closure, 'user' state might be stale or null initially.
-                // We can fetch the user role or just try to update 'therapists' collection.
-                // If the user is NOT a therapist, writing to 'therapists/{uid}' might be undesirable if it creates a dummy doc.
-                // However, the previous implementation did this. Let's try to be safer by checking if we have a user object in the closure scope if possible,
-                // or just accepting that for now we might ping 'therapists' for all users.
-                // Ideally, we should check `auth.currentUser` claims or similar.
-                // For this implementation, let's proceed with the previous logic which was acceptable to the user.
-
-                try {
-                    const therapistRef = doc(db, 'therapists', uid);
-                    // We use updateDoc if we want to avoid creating new docs, but setDoc with merge is what was used.
-                    // Let's use setDoc with merge: true.
-                    await setDoc(therapistRef, {
-                        isOnline: !isOffline,
-                        lastOnline: serverTimestamp()
-                    }, { merge: true });
-                } catch (e) {
-                    // Ignore errors during unload or if permission denied (e.g. not a therapist)
-                }
-            }
-        };
-
-        const onVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                handlePresence(true);
-            } else {
-                handlePresence(false);
-            }
-        };
-
-        const onBeforeUnload = () => {
-            handlePresence(true);
-        };
-
-        window.addEventListener('beforeunload', onBeforeUnload);
-        document.addEventListener('visibilitychange', onVisibilityChange);
-
-        return () => {
-
-            window.removeEventListener('beforeunload', onBeforeUnload);
-            document.removeEventListener('visibilitychange', onVisibilityChange);
-            handlePresence(true); // Set offline on unmount
-            unsubscribe();
-        };
+        return () => unsubscribe();
     }, []);
 
     const login = async (email: string, password: string) => {
@@ -179,12 +192,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Fetch user role to determine if we need to update therapist status
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             if (userDoc.exists() && userDoc.data().role === 'therapist') {
-                // Update online status
+                // Set online status immediately on login (heartbeat will maintain it)
+
+                // Set online status
                 const therapistRef = doc(db, 'therapists', firebaseUser.uid);
-                // Check if therapist doc exists first (it should, but safety first)
-                // actually setDoc with merge is safer if it doesn't exist yet, but typically dashboard creates it.
-                // We'll use setDoc with merge: true to be safe
-                await setDoc(therapistRef, { isOnline: true, lastOnline: serverTimestamp() }, { merge: true });
+                await setDoc(therapistRef, {
+                    isOnline: true,
+                    lastOnline: serverTimestamp(),
+                    currentSessionStart: serverTimestamp()
+                }, { merge: true });
             }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to login';
@@ -260,13 +276,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // We can check the local 'user' state
             if (user && user.role === 'therapist') {
                 try {
-                    await setDoc(doc(db, 'therapists', user.id), { isOnline: false, lastOnline: serverTimestamp() }, { merge: true });
+                    const therapistRef = doc(db, 'therapists', user.id);
+
+                    // Fetch to get session start for logging work
+                    const currentDoc = await getDoc(therapistRef);
+                    if (currentDoc.exists()) {
+                        const data = currentDoc.data();
+                        // Only if currently online
+                        if (data.isOnline) {
+                            const sessionStart = data.currentSessionStart;
+                            if (sessionStart) {
+                                const startTime = sessionStart.toDate();
+                                const endTime = new Date();
+                                const duration = differenceInMinutes(endTime, startTime);
+
+                                if (duration > 0) {
+                                    await addDoc(collection(db, 'work_logs'), {
+                                        therapistId: user.id,
+                                        startTime: sessionStart,
+                                        endTime: Timestamp.fromDate(endTime),
+                                        durationMinutes: duration,
+                                        createdAt: serverTimestamp()
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    await setDoc(therapistRef, {
+                        isOnline: false,
+                        lastOnline: serverTimestamp(),
+                        currentSessionStart: null
+                    }, { merge: true });
                 } catch (e) {
                     console.error("Failed to update offline status", e);
                 }
             }
 
             await signOut(auth);
+            stopHeartbeat();
             setUser(null);
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to logout';

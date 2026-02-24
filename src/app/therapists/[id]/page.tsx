@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import TimeSlotPicker from '@/components/scheduling/TimeSlotPicker';
 import { getDefaultAvailability, formatTimeSlot, getDayName } from '@/lib/scheduling/availability';
 import { useAuth } from '@/contexts/AuthContext';
@@ -255,7 +255,7 @@ export default function TherapistProfilePage() {
     if (!therapist) {
         return (
             <div className="min-h-screen">
-                <Header />
+
                 <div className="pt-32 pb-20 text-center">
                     <h1 className="font-serif text-2xl text-[var(--primary-700)] mb-4">
                         Therapist Not Found
@@ -264,14 +264,14 @@ export default function TherapistProfilePage() {
                         ← Back to Therapists
                     </Link>
                 </div>
-                <Footer />
+
             </div>
         );
     }
 
     return (
         <div className="min-h-screen">
-            <Header />
+
 
             {/* Breadcrumb */}
             <div className="pt-24 pb-4 bg-[var(--warm-50)]">
@@ -485,7 +485,7 @@ export default function TherapistProfilePage() {
                 </div>
             </section>
 
-            <Footer />
+
         </div>
     );
 }

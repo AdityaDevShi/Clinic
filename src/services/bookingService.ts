@@ -2,7 +2,6 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, addDoc, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { Availability, Booking, TimeSlot, Feedback, Therapist } from '@/types';
 import { getDefaultAvailability, generateTimeSlotsForDate } from '@/lib/scheduling/availability';
-import { demoTherapists } from '@/lib/demoData';
 import { addDays, endOfDay, startOfDay } from 'date-fns';
 
 export const BookingService = {
@@ -265,6 +264,51 @@ export const BookingService = {
         return generateTimeSlotsForDate(date, availability, busySlots, filteredBookings);
     },
     /**
+     * Recalculates the exact average rating and review count for a therapist 
+     * based ONLY on currently public feedback.
+     */
+    async recalculateTherapistRating(therapistId: string): Promise<void> {
+        if (!db) throw new Error("Database not initialized");
+
+        try {
+            // Get all PUBLIC feedback for this therapist
+            const feedbackRef = collection(db, 'feedback');
+            // We need a composite index if we query by therapistId and isPublic, 
+            // but we can just query by therapistId and filter in memory if the dataset is small,
+            // or we just query by therapistId and filter out the hidden ones.
+            const q = query(feedbackRef, where('therapistId', '==', therapistId));
+            const snapshot = await getDocs(q);
+
+            let totalRating = 0;
+            let publicReviewCount = 0;
+
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (data.isPublic !== false) { // Default to true if undefined
+                    totalRating += (data.rating || 0);
+                    publicReviewCount++;
+                }
+            });
+
+            const newAverage = publicReviewCount > 0
+                ? parseFloat((totalRating / publicReviewCount).toFixed(1))
+                : 0;
+
+            // Update Therapist document
+            const therapistRef = doc(db, 'therapists', therapistId);
+            await setDoc(therapistRef, {
+                rating: newAverage,
+                reviewCount: publicReviewCount
+            }, { merge: true });
+
+            console.log(`Recalculated rating for therapist ${therapistId}: ${newAverage} (${publicReviewCount} reviews)`);
+        } catch (error) {
+            console.error("Error recalculating therapist rating:", error);
+            throw error;
+        }
+    },
+
+    /**
      * Submit feedback and update therapist rating
      */
     async submitFeedback(feedbackData: Omit<Feedback, 'id' | 'createdAt'>): Promise<void> {
@@ -290,36 +334,8 @@ export const BookingService = {
             const bookingRef = doc(db, 'bookings', feedbackData.bookingId);
             await setDoc(bookingRef, { isRated: true }, { merge: true });
 
-            // 4. Update Therapist Rating
-            const therapistRef = doc(db, 'therapists', feedbackData.therapistId);
-            const therapistDoc = await getDoc(therapistRef);
-
-            if (therapistDoc.exists()) {
-                const data = therapistDoc.data() as Therapist;
-                const currentRating = data.rating || 0;
-                const currentCount = data.reviewCount || 0;
-
-                const newCount = currentCount + 1;
-                const newRating = ((currentRating * currentCount) + feedbackData.rating) / newCount;
-
-                await setDoc(therapistRef, {
-                    ...data,
-                    rating: parseFloat(newRating.toFixed(1)), // Round to 1 decimal
-                    reviewCount: newCount
-                });
-            } else {
-                // Check if it's a demo therapist and hydrate if needed
-                const demoData = demoTherapists[feedbackData.therapistId];
-                if (demoData) {
-                    // Create the document with initial rating
-                    await setDoc(therapistRef, {
-                        ...demoData,
-                        rating: feedbackData.rating,
-                        reviewCount: 1,
-                        updatedAt: Timestamp.now()
-                    });
-                }
-            }
+            // 4. Update Therapist Rating (Recalculate exactly)
+            await this.recalculateTherapistRating(feedbackData.therapistId);
 
         } catch (error) {
             console.error("Error submitting feedback:", error);

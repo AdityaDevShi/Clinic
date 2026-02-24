@@ -4,8 +4,8 @@ import { useState, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
 
@@ -327,13 +327,13 @@ function SignupFormFallback() {
 export default function SignupPage() {
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
             <main className="flex-1 flex items-center justify-center py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <Suspense fallback={<SignupFormFallback />}>
                     <SignupForm />
                 </Suspense>
             </main>
-            <Footer />
+
         </div>
     );
 }
