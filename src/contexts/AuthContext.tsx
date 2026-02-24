@@ -30,11 +30,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 let heartbeatInterval: NodeJS.Timeout | null = null;
 let currentTherapistId: string | null = null;
 
-const handlePageHide = () => {
+const handleBeforeUnload = () => {
     if (currentTherapistId) {
         try {
-            // We include the exact time the tab was closed/navigated away
-            const data = JSON.stringify({ therapistId: currentTherapistId, beaconTime: Date.now() });
+            // Explicitly mark this as an unload event so the serverless function handles it immediately
+            const data = JSON.stringify({ therapistId: currentTherapistId, isUnload: true });
             navigator.sendBeacon('/api/presence/offline', data);
         } catch (e) {
             console.error('sendBeacon failed:', e);
@@ -54,16 +54,16 @@ function startHeartbeat(therapistId: string) {
     // Send immediately on login
     sendHeartbeat(therapistId);
 
-    // Then ping every 30 seconds
+    // Ping every 15 seconds to ensure we stay well under the 35s server death threshold
     heartbeatInterval = setInterval(() => {
         if (currentTherapistId === therapistId) {
             sendHeartbeat(therapistId);
         }
-    }, 30000);
+    }, 15000);
 
-    // Only trigger offline when the user actually unloads the document or navigates away.
-    // 'pagehide' is the recommended modern event for this instead of 'unload' or 'visibilitychange'.
-    window.addEventListener('pagehide', handlePageHide);
+    // Only trigger immediate offline when the user actually closes the tab or refreshes.
+    // 'beforeunload' works most consistently across desktop and mobile production environments.
+    window.addEventListener('beforeunload', handleBeforeUnload);
 }
 
 function stopHeartbeat() {
@@ -72,7 +72,7 @@ function stopHeartbeat() {
         heartbeatInterval = null;
     }
     currentTherapistId = null;
-    window.removeEventListener('pagehide', handlePageHide);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
 }
 
 function sendHeartbeat(therapistId: string) {
