@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -39,48 +39,8 @@ const staggerContainer = {
     }
 };
 
-// Demo therapists
-const demoTherapists: Therapist[] = [
-    {
-        id: '1',
-        name: 'Dr. Shiwani Kohli',
-        email: 'shiwani@arambhmentalhealth.com',
-        specialization: 'Clinical Psychology',
-        bio: 'Clinical Psychologist with expertise in anxiety, depression, and trauma therapy.',
-        isOnline: true,
-        isEnabled: true,
-        hourlyRate: 2500,
-        lastOnline: new Date(),
-        qualifications: ['M.Phil Clinical Psychology'],
-        languages: ['English', 'Hindi'],
-    },
-    {
-        id: '2',
-        name: 'Dr. Priya Sharma',
-        email: 'priya@arambhmentalhealth.com',
-        specialization: 'Child & Adolescent Psychology',
-        bio: 'Specialized in working with children and teenagers facing emotional and developmental challenges.',
-        isOnline: true,
-        isEnabled: true,
-        hourlyRate: 2000,
-        lastOnline: new Date(),
-        qualifications: ['Ph.D. Child Psychology'],
-        languages: ['English', 'Hindi', 'Punjabi'],
-    },
-    {
-        id: '3',
-        name: 'Dr. Rahul Verma',
-        email: 'rahul@arambhmentalhealth.com',
-        specialization: 'Couples & Family Therapy',
-        bio: 'Expert in relationship counseling and family dynamics.',
-        isOnline: false,
-        isEnabled: true,
-        hourlyRate: 3500,
-        lastOnline: new Date(Date.now() - 3600000),
-        qualifications: ['M.A. Psychology', 'Certified Couples Therapist'],
-        languages: ['English', 'Hindi'],
-    },
-];
+// Initial empty data
+const initialTherapists: Therapist[] = [];
 
 interface TherapistFormData {
     name: string;
@@ -96,7 +56,7 @@ export default function AdminTherapistsPage() {
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
 
-    const [therapists, setTherapists] = useState<Therapist[]>(demoTherapists);
+    const [therapists, setTherapists] = useState<Therapist[]>(initialTherapists);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -155,7 +115,7 @@ export default function AdminTherapistsPage() {
                     setTherapists(fetchedTherapists);
                 }
             } catch (error) {
-                console.log('Using demo therapists:', error);
+                console.error('Error fetching therapists:', error);
             } finally {
                 setLoading(false);
             }
@@ -181,13 +141,8 @@ export default function AdminTherapistsPage() {
                 return updated;
             });
         } catch (error) {
-            console.error('Error updating therapist, reverting to local update:', error);
-            // Update locally anyway for demo
-            setTherapists((prev) =>
-                prev.map((t) =>
-                    t.id === therapist.id ? { ...t, isEnabled: !t.isEnabled } : t
-                )
-            );
+            console.error('Error updating therapist:', error);
+            alert('Failed to update therapist status.');
         }
     };
 
@@ -228,25 +183,8 @@ export default function AdminTherapistsPage() {
                 languages: '',
             });
         } catch (error) {
-            console.log('Error adding therapist:', error);
-            // Add locally for demo
-            const newId = `demo_${Date.now()}`;
-            setTherapists((prev) => [
-                ...prev,
-                {
-                    id: newId,
-                    name: formData.name,
-                    email: formData.email,
-                    specialization: formData.specialization,
-                    bio: formData.bio,
-                    hourlyRate: formData.hourlyRate,
-                    qualifications: formData.qualifications.split(',').map((q) => q.trim()),
-                    languages: formData.languages.split(',').map((l) => l.trim()),
-                    isOnline: false,
-                    isEnabled: true,
-                    lastOnline: new Date(),
-                },
-            ]);
+            console.error('Error adding therapist:', error);
+            alert('Failed to add therapist.');
             setShowAddModal(false);
         } finally {
             setSubmitting(false);
@@ -272,7 +210,7 @@ export default function AdminTherapistsPage() {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <div className="max-w-5xl mx-auto">
@@ -527,7 +465,7 @@ export default function AdminTherapistsPage() {
                 </div>
             )}
 
-            <Footer />
+
         </div>
     );
 }

@@ -4,8 +4,8 @@ import { useState, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -40,21 +40,6 @@ function LoginForm() {
             const userRef = doc(db, 'users', userCredential.user.uid);
             let userDoc = await getDoc(userRef);
 
-            // DEMO OVERRIDE: Persist therapist role in Firestore
-            if (email.toLowerCase() === 'therapist@demo.com') {
-                const userData = userDoc.data();
-                if (userData?.role !== 'therapist') {
-                    // Update Firestore so AuthContext picks it up on next load
-                    await setDoc(userRef, {
-                        role: 'therapist',
-                        email: email, // Ensure email is set
-                        name: 'Dr. Shiwani Kohli' // Set a nice name for the demo
-                    }, { merge: true });
-
-                    // Fetch updated doc
-                    userDoc = await getDoc(userRef);
-                }
-            }
 
             const userData = userDoc.data();
             const role = userData?.role || 'client';
@@ -202,7 +187,7 @@ function LoginForm() {
 export default function LoginPage() {
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 flex items-center justify-center px-4 py-12 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <Suspense fallback={<div className="text-center">Loading...</div>}>
@@ -210,7 +195,7 @@ export default function LoginPage() {
                 </Suspense>
             </main>
 
-            <Footer />
+
         </div>
     );
 }

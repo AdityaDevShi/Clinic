@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, orderBy, limit, startAfter } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -117,7 +117,7 @@ export default function AdminBookingsPage() {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <div className="max-w-7xl mx-auto">
@@ -239,7 +239,7 @@ export default function AdminBookingsPage() {
                 </div>
             </main>
 
-            <Footer />
+
         </div>
     );
 }

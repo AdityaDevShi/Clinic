@@ -6,8 +6,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, Clock, Check, CreditCard, Video, ChevronLeft, ChevronRight, Loader2, MapPin, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { format, addDays, subDays, startOfToday, isBefore, isToday, parse, isAfter } from 'date-fns';
 import { BookingService } from '@/services/bookingService';
 import { TimeSlot } from '@/types';
@@ -214,7 +214,7 @@ function BookingContent() {
 
     return (
         <div className="min-h-screen bg-[var(--neutral-50)]">
-            <Header />
+
 
             <div className="pt-24 md:pt-32 pb-12 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Back Link */}
@@ -489,7 +489,7 @@ function BookingContent() {
                     </div>
                 </div>
             </div>
-            <Footer />
+
         </div>
     );
 }

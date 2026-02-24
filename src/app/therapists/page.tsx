@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { Search, Filter, MapPin, Star, ArrowRight, Video, Calendar } from 'lucide-react';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -110,7 +110,7 @@ export default function TherapistsPage() {
 
     return (
         <div className="min-h-screen">
-            <Header />
+
 
             {/* Hero Section */}
             <section className="pt-24 md:pt-32 pb-12 md:pb-16 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
@@ -234,19 +234,32 @@ export default function TherapistsPage() {
                                     </p>
 
                                     {/* Rating */}
-                                    {therapist.rating && therapist.rating > 0 ? (
-                                        <div className="flex items-center justify-center gap-1 mb-3">
-                                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                                            <span className="font-medium text-[var(--neutral-900)]">
-                                                {therapist.rating.toFixed(1)}
-                                            </span>
-                                            <span className="text-xs text-[var(--neutral-500)]">
-                                                ({therapist.reviewCount} reviews)
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <div className="h-7 mb-3"></div>
-                                    )}
+                                    {(() => {
+                                        let displayRating = therapist.rating || 0;
+                                        let displayCount = therapist.reviewCount || 0;
+
+                                        if (displayCount === 0 && therapist.testimonials && therapist.testimonials.length > 0) {
+                                            displayCount = therapist.testimonials.length;
+                                            const total = therapist.testimonials.reduce((acc, t) => acc + (t.rating || 5), 0);
+                                            displayRating = total / displayCount;
+                                        }
+
+                                        if (displayCount > 0) {
+                                            return (
+                                                <div className="flex items-center justify-center gap-1 mb-3">
+                                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                                    <span className="font-bold text-[var(--neutral-800)]">
+                                                        {displayRating.toFixed(1)}
+                                                    </span>
+                                                    <span className="text-sm">
+                                                        ({displayCount} reviews)
+                                                    </span>
+                                                </div>
+                                            );
+                                        }
+
+                                        return <div className="h-7 mb-3"></div>;
+                                    })()}
 
                                     {/* Status Text */}
                                     <p className={`text-xs font-medium mb-4 ${therapist.isOnline ? 'text-green-600' : 'text-gray-400'}`}>
@@ -300,7 +313,7 @@ export default function TherapistsPage() {
                 </div>
             </section>
 
-            <Footer />
+
         </div>
     );
 }

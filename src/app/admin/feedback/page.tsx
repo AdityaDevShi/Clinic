@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -24,6 +24,7 @@ import {
     User
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { BookingService } from '@/services/bookingService';
 
 export default function AdminFeedbackPage() {
     const router = useRouter();
@@ -67,9 +68,17 @@ export default function AdminFeedbackPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this feedback?')) return;
+
+        const itemToDelete = feedback.find(f => f.id === id);
+        if (!itemToDelete) return;
+
         try {
             await deleteDoc(doc(db, 'feedback', id));
             setFeedback(prev => prev.filter(f => f.id !== id));
+
+            // Recalculate therapist rating to reflect deletion
+            await BookingService.recalculateTherapistRating(itemToDelete.therapistId);
+
             toast.success('Feedback deleted');
         } catch (error) {
             console.error("Error deleting feedback:", error);
@@ -79,11 +88,19 @@ export default function AdminFeedbackPage() {
 
     const toggleVisibility = async (id: string, currentStatus: boolean, e: React.MouseEvent) => {
         e.stopPropagation();
+
+        const itemToToggle = feedback.find(f => f.id === id);
+        if (!itemToToggle) return;
+
         try {
             await updateDoc(doc(db, 'feedback', id), { isPublic: !currentStatus });
             setFeedback(prev => prev.map(f =>
                 f.id === id ? { ...f, isPublic: !currentStatus } : f
             ));
+
+            // Recalculate therapist rating to reflect visibility change
+            await BookingService.recalculateTherapistRating(itemToToggle.therapistId);
+
             toast.success(currentStatus ? 'Feedback hidden' : 'Feedback visible');
         } catch (error) {
             console.error("Error updating visibility:", error);
@@ -114,7 +131,7 @@ export default function AdminFeedbackPage() {
 
     return (
         <div className="min-h-screen bg-[#FAFAF8]">
-            <Header />
+
             <div className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-screen">
                 <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
@@ -232,7 +249,7 @@ export default function AdminFeedbackPage() {
                     )}
                 </div>
             </div>
-            <Footer />
+
         </div>
     );
 }

@@ -6,13 +6,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, getDocs, orderBy, limit, where, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, where, doc, getDoc, setDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Booking, TimeSlot } from '@/types';
-import { format, isSameDay, addDays } from 'date-fns';
+import { format, isSameDay, addDays, differenceInMinutes } from 'date-fns';
 import { BookingService } from '@/services/bookingService';
 import {
     Calendar,
@@ -161,9 +161,8 @@ export default function TherapistDashboardPage() {
         }
     }, [user, authLoading]);
 
-    // 2. Real-time Bookings Subscription
+    // 2. Real-time Bookings & Hours Subscription
     useEffect(() => {
-        // Auth Redirection Logic
         if (!authLoading) {
             if (!user) {
                 router.push('/login?redirect=/therapist/dashboard');
@@ -180,74 +179,110 @@ export default function TherapistDashboardPage() {
         setLoading(true);
 
         const therapistRef = doc(db, 'therapists', user.id);
-        let therapistHourlyRate = 1500;
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        // Get rate once (could also be real-time but less critical)
+        let therapistHourlyRate = 1500;
         getDoc(therapistRef).then(snap => {
             if (snap.exists()) {
                 therapistHourlyRate = snap.data().hourlyRate || 1500;
             }
         });
 
+        // State trackers for combined stats
+        let staticMinutes = 0;
+        let activeMinutes = 0;
+        let isCurrentlyOnline = false;
+
+        let lastEarnings = 0;
+        let lastAppointments = 0;
+        let lastPatients = 0;
+
+        const updateStats = () => {
+            const totalHours = parseFloat(((staticMinutes + activeMinutes) / 60).toFixed(1));
+            setStats({
+                appointmentsToday: lastAppointments,
+                totalPatients: lastPatients,
+                hoursThisMonth: totalHours,
+                earningsThisMonth: lastEarnings
+            });
+        };
+
+        // Subscribe to Work Logs (Offline time chunks)
+        const logsQ = query(
+            collection(db, 'work_logs'),
+            where('therapistId', '==', user.id),
+            where('createdAt', '>=', Timestamp.fromDate(monthStart))
+        );
+        const unsubscribeLogs = onSnapshot(logsQ, (snap) => {
+            let mins = 0;
+            snap.forEach(d => mins += d.data().durationMinutes || 0);
+            staticMinutes = mins;
+            updateStats();
+        });
+
+        // Subscribe to Therapist Doc (Active session time)
+        const unsubscribeTherapist = onSnapshot(therapistRef, (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                isCurrentlyOnline = !!data.isOnline;
+                if (data.isOnline && data.currentSessionStart) {
+                    activeMinutes = differenceInMinutes(new Date(), data.currentSessionStart.toDate());
+                } else {
+                    activeMinutes = 0;
+                }
+                updateStats();
+            }
+        });
+
         // Subscribe to Bookings
-        const unsubscribe = BookingService.subscribeToTherapistBookings(user.id, (bookings) => {
-            // Sort client-side
+        const unsubscribeBookings = BookingService.subscribeToTherapistBookings(user.id, (bookings) => {
             bookings.sort((a, b) => b.sessionTime.getTime() - a.sessionTime.getTime());
 
-            // Calculate stats
-            const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-            // 1. Appointments Today (Remaining/Active)
-            const appointmentsToday = bookings.filter(b =>
+            lastAppointments = bookings.filter(b =>
                 isSameDay(b.sessionTime, now) &&
                 b.sessionTime > now &&
                 (b.status === 'confirmed' || b.status === 'pending')
             ).length;
 
-            // 2. Total Patients (Unique Client IDs)
             const uniquePatients = new Set(bookings.map(b => b.clientId));
+            lastPatients = uniquePatients.size;
 
-            // Set recent bookings (Upcoming only)
             const upcomingBookingsList = bookings.filter(b =>
                 b.sessionTime > now &&
                 (b.status === 'confirmed' || b.status === 'pending')
             );
-            // Since list is sorted desc (newest first), upcoming should be sorted asc (soonest first)
             upcomingBookingsList.sort((a, b) => a.sessionTime.getTime() - b.sessionTime.getTime());
-
             setRecentBookings(upcomingBookingsList.slice(0, 5));
 
-            // Filter bookings for this month
             const thisMonthBookings = bookings.filter(b =>
                 b.sessionTime >= monthStart && b.sessionTime <= monthEnd
             );
 
-            // 3. Earnings (Month)
-            const earnings = thisMonthBookings.reduce((acc, curr) => {
+            lastEarnings = thisMonthBookings.reduce((acc, curr) => {
                 const amount = curr.amount || therapistHourlyRate;
                 return ['paid', 'confirmed', 'completed'].includes(curr.status) ? acc + amount : acc;
             }, 0);
 
-            // 4. Hours (Month)
-            const clinicalMinutes = thisMonthBookings.reduce((acc, curr) =>
-                curr.status === 'completed' ? acc + (curr.duration || 60) : acc
-                , 0);
-            const hoursThisMonth = Math.round(clinicalMinutes / 60);
-
-            setStats({
-                appointmentsToday,
-                totalPatients: uniquePatients.size,
-                hoursThisMonth,
-                earningsThisMonth: earnings
-            });
-
+            updateStats();
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        // Interval to update active minutes dynamically
+        const intervalId = setInterval(() => {
+            if (isCurrentlyOnline) {
+                activeMinutes++;
+                updateStats();
+            }
+        }, 60000);
 
+        return () => {
+            unsubscribeBookings();
+            unsubscribeLogs();
+            unsubscribeTherapist();
+            clearInterval(intervalId);
+        };
     }, [user, authLoading, router]);
 
     const getStatusBadge = (status: Booking['status']) => {
@@ -275,7 +310,7 @@ export default function TherapistDashboardPage() {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header />
+
 
             <main className="flex-1 py-24 px-4 bg-gradient-to-b from-[var(--warm-100)] to-[var(--warm-50)]">
                 <div className="max-w-7xl mx-auto">
@@ -519,7 +554,7 @@ export default function TherapistDashboardPage() {
                 </div>
             )}
 
-            <Footer />
+
         </div>
     );
 }

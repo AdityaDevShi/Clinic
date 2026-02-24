@@ -5,13 +5,12 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Therapist, Feedback } from '@/types';
-import { demoTherapists } from '@/lib/demoData';
 
 import {
     ArrowLeft,
@@ -46,6 +45,54 @@ const staggerContainer = {
         }
     }
 };
+
+// Extracted testimonial component for local state management (read more)
+function TestimonialCard({ item }: { item: { content?: string, comment?: string, rating: number, author?: string, isSystem?: boolean, date?: string } }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const text = item.content || item.comment || "";
+    const isLongText = text.length > 200; // Increased to 200 to better match screenshot
+
+    return (
+        <div className={`snap-center shrink-0 w-[90%] md:w-[60%] lg:w-[45%] p-8 rounded-3xl shadow-sm border border-[var(--neutral-200)] relative flex flex-col transition-all duration-300 ${item.isSystem ? 'bg-[var(--warm-50)]' : 'bg-white'}`}>
+            {!item.isSystem && <Quote className="absolute top-6 right-6 w-8 h-8 text-[var(--primary-100)] opacity-50" />}
+
+            <div className="flex items-center gap-1 mb-4">
+                {[...Array(5)].map((_, stars) => (
+                    <Star key={stars} className={`w-5 h-5 ${stars < item.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`} />
+                ))}
+            </div>
+
+            <div className="flex-1 mb-6 relative">
+                <p className={`text-[var(--neutral-600)] leading-relaxed italic ${!isExpanded && isLongText ? 'line-clamp-4' : ''}`}>
+                    "{text}"
+                </p>
+                {!isExpanded && isLongText && (
+                    <div className="absolute -bottom-2 right-0 left-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none md:hidden"></div>
+                )}
+            </div>
+
+            <div className="flex items-center justify-between mt-auto pt-4 border-t border-[var(--neutral-100)]">
+                <div>
+                    <div className="text-sm font-bold text-[var(--primary-700)]">
+                        {item.isSystem ? '- Verified Patient' : `- ${item.author}`}
+                    </div>
+                    {item.date && (
+                        <div className="text-xs text-[var(--neutral-400)] mt-1">{item.date}</div>
+                    )}
+                </div>
+
+                {isLongText && (
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="text-sm font-semibold text-[var(--primary-600)] hover:text-[var(--primary-800)] transition-colors hover:underline"
+                    >
+                        {isExpanded ? 'See less' : 'See more...'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function ProfileContent() {
     const searchParams = useSearchParams();
@@ -98,20 +145,12 @@ function ProfileContent() {
                     lastOnline: data.lastOnline?.toDate() || new Date(),
                 } as Therapist);
             } else {
-                // Demo fallback
-                const demo = demoTherapists[therapistId];
-                if (demo) {
-                    setTherapist(demo);
-                }
+                setTherapist(null);
             }
             setLoading(false);
         }, (err) => {
             console.error("Error fetching therapist:", err);
-            // Fallback on error too
-            const demo = demoTherapists[therapistId];
-            if (demo) {
-                setTherapist(demo);
-            }
+            setTherapist(null);
             setLoading(false);
         });
 
@@ -131,9 +170,30 @@ function ProfileContent() {
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
-    const avgRating = reviews.length > 0
-        ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
-        : 0;
+    // Calculate combined rating from system reviews AND custom testimonials
+    const allRatings: number[] = [];
+    reviews.forEach(r => { if (r.rating) allRatings.push(r.rating); });
+    therapist?.testimonials?.forEach(t => { if (t.rating) allRatings.push(t.rating); });
+
+    let displayRating = 0;
+    let displayCount = 0;
+
+    if (therapist?.rating && therapist?.reviewCount) {
+        // Prefer the exact backend calculated values if they exist natively and are non-zero
+        displayRating = therapist.rating;
+        displayCount = therapist.reviewCount;
+
+        // However, if the backend reviewCount is 0 but we have custom testimonials, 
+        // fallback to the custom testimonials.
+        if (displayCount === 0 && allRatings.length > 0) {
+            displayCount = allRatings.length;
+            displayRating = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
+        }
+    } else {
+        // Fallback to manual slice if the backend rating is missing
+        displayCount = allRatings.length;
+        displayRating = displayCount > 0 ? (allRatings.reduce((a, b) => a + b, 0) / displayCount) : 0;
+    }
 
     if (loading) {
         return (
@@ -146,7 +206,7 @@ function ProfileContent() {
     if (!therapist || !therapistId) {
         return (
             <div className="min-h-screen">
-                <Header />
+
                 <div className="pt-32 pb-20 text-center">
                     <h1 className="font-serif text-2xl text-[var(--primary-700)] mb-4">
                         Therapist Not Found
@@ -155,14 +215,14 @@ function ProfileContent() {
                         ← Back to Therapists
                     </Link>
                 </div>
-                <Footer />
+
             </div>
         );
     }
 
     return (
         <div className="min-h-screen bg-[#FAFAF8]">
-            <Header />
+
 
             {/* Breadcrumb */}
             <div className="pt-24 pb-4 bg-[var(--warm-50)]">
@@ -234,10 +294,10 @@ function ProfileContent() {
                                 <div className="flex items-center gap-2">
                                     <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                                     <span className="font-bold text-[var(--neutral-800)]">
-                                        {(therapist.rating || avgRating).toFixed(1)}
+                                        {displayRating.toFixed(1)}
                                     </span>
                                     <span className="text-sm">
-                                        ({therapist.reviewCount || reviews.length} reviews)
+                                        ({displayCount} reviews)
                                     </span>
                                 </div>
                                 {therapist.patientsHelped && (
@@ -270,10 +330,10 @@ function ProfileContent() {
 
             {/* Main Content */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="grid lg:grid-cols-3 gap-12">
+                <div className="flex flex-col lg:flex-row gap-12 items-start relative">
 
                     {/* LEFT COLUMN: Details */}
-                    <div className="lg:col-span-2 space-y-12">
+                    <div className="w-full lg:w-2/3 space-y-12 min-w-0">
 
                         {/* 1. About Section (First as requested) */}
                         <motion.div
@@ -281,11 +341,12 @@ function ProfileContent() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             id="about-section"
+                            className="bg-white p-8 rounded-2xl shadow-sm border border-[var(--neutral-100)]"
                         >
                             <h2 className="font-serif text-2xl text-[var(--primary-800)] mb-4">About {therapist.name.split(' ')[0]}</h2>
                             <div
                                 className="prose prose-stone max-w-none text-[var(--neutral-600)] leading-relaxed"
-                                dangerouslySetInnerHTML={{ __html: therapist.about || therapist.bio }}
+                                dangerouslySetInnerHTML={{ __html: (therapist.about || therapist.bio || '').replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ') }}
                             />
                         </motion.div>
 
@@ -455,6 +516,52 @@ function ProfileContent() {
                             )}
                         </div>
 
+                        {/* Media Mentions / News Articles */}
+                        {therapist.mediaMentions && therapist.mediaMentions.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                className="bg-white p-8 rounded-2xl shadow-sm border border-[var(--neutral-100)]"
+                            >
+                                <h2 className="font-serif text-2xl text-[var(--primary-800)] mb-6 flex items-center gap-2">
+                                    <Globe className="w-6 h-6 text-[var(--secondary-500)]" />
+                                    In the Media
+                                </h2>
+                                <div className="space-y-4">
+                                    {therapist.mediaMentions.map((mention) => (
+                                        <a
+                                            key={mention.id}
+                                            href={mention.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block p-4 rounded-xl border border-[var(--neutral-200)] hover:border-[var(--primary-300)] hover:bg-[var(--neutral-50)] transition-all group"
+                                        >
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div>
+                                                    <h3 className="font-medium text-[var(--neutral-800)] group-hover:text-[var(--primary-700)] transition-colors line-clamp-2 mb-1">
+                                                        {mention.title}
+                                                    </h3>
+                                                    <div className="flex items-center text-sm text-[var(--neutral-500)] gap-2">
+                                                        <span className="font-medium">{mention.publisher}</span>
+                                                        {mention.date && (
+                                                            <>
+                                                                <span className="w-1 h-1 rounded-full bg-[var(--neutral-300)]"></span>
+                                                                <span>{mention.date}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="p-2 rounded-full bg-[var(--primary-50)] text-[var(--primary-600)] shrink-0">
+                                                    <ArrowLeft className="w-4 h-4 rotate-[135deg]" />
+                                                </div>
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+
                         {/* 5. Testimonials (Custom + System) */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -466,41 +573,46 @@ function ProfileContent() {
                                 What Clients Say
                             </h2>
 
-                            <div className="grid md:grid-cols-2 gap-4">
-                                {/* Custom Testimonials */}
-                                {therapist.testimonials?.map((t, i) => (
-                                    <div key={`custom-${i}`} className="bg-white p-6 rounded-2xl shadow-sm border border-[var(--neutral-100)] relative">
-                                        <Quote className="absolute top-4 right-4 w-8 h-8 text-[var(--primary-100)]" />
-                                        <div className="flex items-center gap-1 mb-3">
-                                            {[...Array(5)].map((_, stars) => (
-                                                <Star key={stars} className={`w-4 h-4 ${stars < t.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
-                                            ))}
-                                        </div>
-                                        <p className="text-[var(--neutral-600)] mb-4 italic">"{t.content}"</p>
-                                        <div className="text-sm font-bold text-[var(--primary-700)]">- {t.author}</div>
-                                    </div>
-                                ))}
+                            <div className="relative">
+                                <div
+                                    className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 pt-4 custom-scrollbar"
+                                >
+                                    {/* Custom Testimonials */}
+                                    {therapist.testimonials?.map((t, i) => (
+                                        <TestimonialCard
+                                            key={`custom-${i}`}
+                                            item={{ ...t, rating: t.rating || 5 }}
+                                        />
+                                    ))}
 
-                                {/* System Reviews (Fallback or Addition) */}
-                                {reviews.slice(0, 3).map((review) => (
-                                    <div key={`review-${review.id}`} className="bg-[var(--warm-50)] p-6 rounded-2xl border border-[var(--warm-100)]">
-                                        <div className="flex items-center gap-1 mb-3">
-                                            {[...Array(5)].map((_, stars) => (
-                                                <Star key={stars} className={`w-4 h-4 ${stars < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
-                                            ))}
+                                    {/* System Reviews */}
+                                    {reviews.map((review) => (
+                                        <TestimonialCard
+                                            key={`review-${review.id}`}
+                                            item={{
+                                                content: review.comment,
+                                                rating: review.rating,
+                                                isSystem: true,
+                                                date: new Date(review.createdAt).toLocaleDateString()
+                                            }}
+                                        />
+                                    ))}
+
+                                    {/* Empty State Fallback */}
+                                    {(!therapist.testimonials?.length && !reviews.length) && (
+                                        <div className="w-full text-center py-12 text-[var(--neutral-400)] italic border border-dashed border-[var(--neutral-200)] rounded-3xl">
+                                            No testimonials available yet.
                                         </div>
-                                        {review.comment && <p className="text-[var(--neutral-600)] mb-4">"{review.comment}"</p>}
-                                        <div className="text-sm text-[var(--neutral-500)]">Verified Patient • {new Date(review.createdAt).toLocaleDateString()}</div>
-                                    </div>
-                                ))}
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
 
                     </div>
 
                     {/* RIGHT COLUMN: Sticky Booking Card */}
-                    <div className="lg:col-span-1">
-                        <div className="sticky top-24 space-y-6">
+                    <div className="w-full lg:w-1/3 min-w-0">
+                        <div className="lg:sticky lg:top-24 space-y-6">
                             <div className="bg-white rounded-2xl shadow-lg border border-[var(--primary-100)] overflow-hidden">
                                 <div className="bg-[var(--primary-600)] p-4 text-center text-white">
                                     <p className="text-sm opacity-90">Session Fee</p>
@@ -514,7 +626,7 @@ function ProfileContent() {
                                             </div>
                                             <div>
                                                 <p className="text-sm font-semibold text-[var(--primary-800)]">Duration</p>
-                                                <p className="text-sm">50-60 Minutes</p>
+                                                <p className="text-sm">{therapist.sessionDuration || '50-60 Minutes'}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 text-[var(--neutral-600)]">
@@ -576,7 +688,7 @@ function ProfileContent() {
                 </div>
             </section>
 
-            <Footer />
+
         </div>
     );
 }

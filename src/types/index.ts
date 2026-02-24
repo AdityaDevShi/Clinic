@@ -36,9 +36,11 @@ export interface Therapist {
     testimonials?: { id: string; author: string; content: string; rating: number; }[]; // content fixed
     certificates?: { id: string; title: string; url: string; }[];
     referralLinks?: { name: string; url: string; }[];
+    mediaMentions?: { id: string; title: string; url: string; publisher: string; date: string; }[];
     therapyModes?: string[];
     availabilitySummary?: string;
     // Dynamic Scheduling Fields
+    sessionDuration?: string;   // e.g. "50-60 Minutes"
     workingHoursStart?: string; // "10:00"
     workingHoursEnd?: string;   // "19:00"
     lunchBreakStart?: string;   // "13:00"
