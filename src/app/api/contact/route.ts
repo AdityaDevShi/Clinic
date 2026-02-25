@@ -1,9 +1,10 @@
-export const runtime = "nodejs";
+// export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email';
-import { db } from '@/lib/firebase/server'; // Use server SDK for API routes
-import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { getAdminDb } from '@/lib/firebase/admin';
+
 // Simple HTML sanitizer to prevent injection in email bodies
 function escapeHtml(str: string): string {
     return str
@@ -38,22 +39,16 @@ export async function POST(req: Request) {
 
         // Rate limiting (Fail Open Strategy)
         try {
-            // 1. Define the start of today
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            const todayTimestamp = Timestamp.fromDate(today);
 
-            const submissionsRef = collection(db, 'contact_submissions');
+            const adminDb = getAdminDb();
+            const submissionsRef = adminDb.collection('contact_submissions');
 
-            // Note: This query requires a composite index on 'email' and 'createdAt'.
-            // If the index is missing, this will throw. We catch it and allow the email to send.
-            const q = query(
-                submissionsRef,
-                where('email', '==', email),
-                where('createdAt', '>=', todayTimestamp)
-            );
-
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = await submissionsRef
+                .where('email', '==', email)
+                .where('createdAt', '>=', today)
+                .get();
 
             if (querySnapshot.size >= 3) {
                 return NextResponse.json(
@@ -63,16 +58,14 @@ export async function POST(req: Request) {
             }
 
             // Record submission
-            await addDoc(submissionsRef, {
+            await submissionsRef.add({
                 email,
                 name,
-                createdAt: Timestamp.now(),  // Use server timestamp
+                createdAt: new Date(),
                 subject: subject || 'General Inquiry'
             });
 
         } catch (rateLimitError) {
-            // Log the error (likely missing index) but ALLOW the message to proceed.
-            // This prevents the contact form from breaking due to missing infra configuration.
             console.warn('Rate limiting check failed (proceeding anyway):', rateLimitError);
         }
 
@@ -106,10 +99,8 @@ ${message}
             <p>${safeMessage}</p>
         `;
 
-        // Send email to the official business email
-        // We send FROM the configured SMTP account (Gmail) TO the official email
         await sendEmail(
-            'care@arambh.net', // Destination
+            'care@arambh.net',
             emailSubject,
             emailText,
             emailHtml
