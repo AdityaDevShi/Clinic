@@ -1,16 +1,9 @@
 export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/server'; // Ensure this is server-compatible or use admin SDK if needed. 
-// Note: Client SDK in API routes works but Admin SDK is better. 
-// For now, using existing config assuming it initializes properly in Node env or we will fix.
-// Actually, standard firebase client SDK works in Next.js API routes (Edge/Node).
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getAdminDb } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email';
-// We need a server-side initialized firebase for API routes if not already present.
-// The current @/lib/firebase likely uses client SDK.
-// It is okay for simple prototyping, but for production, Admin SDK is recommended.
-// proceeding with client SDK logic for now as per 'db' import availability.
 
 export async function POST(req: Request) {
     try {
@@ -30,11 +23,10 @@ export async function POST(req: Request) {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
         // Store in Firestore
-        // We use the email as the document ID for simplicity in 'otp_verifications' collection
-        await setDoc(doc(db, 'otp_verifications', email), {
+        const adminDb = getAdminDb();
+        await adminDb.collection('otp_verifications').doc(email).set({
             otp,
-            createdAt: serverTimestamp(),
-            // Optional: Expiration logic can be handled in verify or via TTL policy
+            createdAt: new Date(),
             expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes from now
         });
 

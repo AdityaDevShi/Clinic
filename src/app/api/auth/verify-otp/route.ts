@@ -1,8 +1,8 @@
 export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/server';
-import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { getAdminDb } from '@/lib/firebase/admin';
 
 export async function POST(req: Request) {
     try {
@@ -12,21 +12,21 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 });
         }
 
-        const docRef = doc(db, 'otp_verifications', email);
-        const docSnap = await getDoc(docRef);
+        const adminDb = getAdminDb();
+        const docRef = adminDb.collection('otp_verifications').doc(email);
+        const docSnap = await docRef.get();
 
-        if (!docSnap.exists()) {
+        if (!docSnap.exists) {
             return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 400 });
         }
 
-        const data = docSnap.data();
+        const data = docSnap.data()!;
 
         // Check if expired
-        // Firestore timestamps need conversion if coming from serverTimestamp() but here likely Date or Timestamp
         const expiresAt = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
         if (new Date() > expiresAt) {
             // Clean up expired OTP
-            await deleteDoc(docRef);
+            await docRef.delete();
             return NextResponse.json({ error: 'OTP has expired' }, { status: 400 });
         }
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         }
 
         // OTP Valid! Delete it to prevent reuse
-        await deleteDoc(docRef);
+        await docRef.delete();
 
         return NextResponse.json({ success: true, message: 'OTP verified successfully' });
     } catch (error: unknown) {

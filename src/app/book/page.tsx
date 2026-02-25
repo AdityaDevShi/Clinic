@@ -4,14 +4,14 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, Clock, Check, CreditCard, Video, ChevronLeft, ChevronRight, Loader2, MapPin, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Check, CreditCard, Video, ChevronLeft, ChevronRight, Loader2, MapPin, XCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 
-import { format, addDays, subDays, startOfToday, isBefore, isToday, parse, isAfter } from 'date-fns';
+import { format, addDays, subDays, startOfToday, startOfDay, isBefore, isToday, parse, isAfter } from 'date-fns';
 import { BookingService } from '@/services/bookingService';
 import { TimeSlot } from '@/types';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -31,6 +31,7 @@ function BookingContent() {
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [therapist, setTherapist] = useState<any>(null); // Quick type for now
+    const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
 
     const [isClient, setIsClient] = useState(false);
     useEffect(() => { setIsClient(true) }, []);
@@ -86,6 +87,34 @@ function BookingContent() {
         fetchSlots();
     }, [selectedDate, therapistId]);
 
+    // Fetch dates the user has already booked (persists across refresh)
+    useEffect(() => {
+        const fetchBookedDates = async () => {
+            if (!user || !db) return;
+            try {
+                const bookingsRef = collection(db, 'bookings');
+                const q = query(
+                    bookingsRef,
+                    where('clientId', '==', user.id),
+                    where('sessionTime', '>=', Timestamp.fromDate(startOfDay(new Date())))
+                );
+                const snapshot = await getDocs(q);
+                const dates = new Set<string>();
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.status !== 'cancelled') {
+                        const sessionDate = data.sessionTime.toDate();
+                        dates.add(format(sessionDate, 'yyyy-MM-dd'));
+                    }
+                });
+                setBookedDates(dates);
+            } catch (error) {
+                console.error('Error fetching booked dates:', error);
+            }
+        };
+        fetchBookedDates();
+    }, [user]);
+
     // Block render entirely if not authenticated (MUST be after all hooks)
     if (authLoading) {
         return (
@@ -130,10 +159,12 @@ function BookingContent() {
             // Deselect
             setSelectedSlots(prev => prev.filter(s => s !== exists));
         } else {
-            // Check if user already has a session selected for THIS date
+            // Check if user already has a session selected for THIS date (in-memory)
             const hasSessionForDate = selectedSlots.some(s => s.date === dateStr);
-            if (hasSessionForDate) {
-                alert("You can only book one session per day.");
+            // Check if user already has a booking for THIS date (from Firestore)
+            const hasExistingBooking = bookedDates.has(dateStr);
+            if (hasSessionForDate || hasExistingBooking) {
+                alert("You already have a session booked for this day. Only one session per day is allowed.");
                 return;
             }
 
@@ -309,6 +340,12 @@ function BookingContent() {
                                             <div className="flex justify-center py-8">
                                                 <Loader2 className="w-8 h-8 text-[var(--primary-600)] animate-spin" />
                                             </div>
+                                        ) : bookedDates.has(format(selectedDate, 'yyyy-MM-dd')) ? (
+                                            <div className="text-center py-8 bg-amber-50 rounded-lg border border-amber-200">
+                                                <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                                                <p className="text-amber-700 font-medium">You already have a session booked on this day.</p>
+                                                <p className="text-amber-600 text-sm mt-1">Only one session per day is allowed. Please select a different date.</p>
+                                            </div>
                                         ) : availableSlots.length === 0 ? (
                                             <div className="text-center py-8 text-[var(--neutral-500)] bg-[var(--neutral-50)] rounded-lg">
                                                 No slots available for this date.
@@ -410,15 +447,11 @@ function BookingContent() {
                                             <span className="text-[var(--neutral-600)]">Sessions per week</span>
                                             <span className="font-medium text-[var(--neutral-900)]">x {sessionsPerWeek}</span>
                                         </div>
-                                        <div className="flex justify-between items-center text-sm text-[var(--neutral-500)] pt-2 border-t border-[var(--warm-200)]">
-                                            <span>Weekly Total (before tax)</span>
-                                            <span>₹{totalCost}</span>
-                                        </div>
                                         <div className="mt-3 pt-3 border-t border-[var(--warm-200)] flex justify-between items-center">
                                             <span className="font-bold text-lg text-[var(--primary-800)]">Total Due</span>
-                                            <span className="font-bold text-lg text-[var(--primary-800)]">₹{(totalCost * 1.18).toFixed(0)}</span>
+                                            <span className="font-bold text-lg text-[var(--primary-800)]">₹{totalCost}</span>
                                         </div>
-                                        <p className="text-xs text-[var(--neutral-500)] mt-2 italic">* Includes 18% GST. This starts your recurring weekly plan.</p>
+                                        <p className="text-xs text-[var(--neutral-500)] mt-2 italic">* This starts your recurring weekly plan.</p>
                                     </div>
 
                                     <button

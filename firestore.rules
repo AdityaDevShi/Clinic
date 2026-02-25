@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // =========================================================================
+    // HELPER FUNCTIONS
+    // =========================================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user has the 'admin' role
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Check if the authenticated user is accessing their own document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =========================================================================
+    // COLLECTION RULES
+    // =========================================================================
+
+    // 1. Users Collection
+    match /users/{userId} {
+      // Anyone can read their own profile, Admins can read all profiles
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Updates are only allowed by the owner (excluding role) or by Admins
+      // Users cannot change their own role parameter.
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['role'])) || isAdmin();
+      
+      // Document creation/deletion is restricted to Server/Admin SDK only
+      // New users are created securely via /api/auth/register-profile
+      allow create, delete: if false; 
+    }
+
+    // 2. Therapists Collection
+    match /therapists/{therapistId} {
+      // Therapist profiles are public for the booking/listing pages
+      allow read: if true;
+      
+      // Only the therapist themselves can update their profile, or an Admin
+      allow update: if isOwner(therapistId) || isAdmin();
+      
+      // Only Admins (or Server SDK) can create/delete therapist profiles
+      allow create, delete: if isAdmin();
+    }
+
+    // 3. Bookings/Appointments Collection
+    match /bookings/{bookingId} {
+      // Users can only read their own bookings. Therapists can read bookings assigned to them.
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.clientId || 
+        request.auth.uid == resource.data.therapistId || 
+        isAdmin()
+      );
+      
+      // Creating a booking requires authentication and setting the clientId to themselves
+      allow create: if isAuthenticated() && request.resource.data.clientId == request.auth.uid;
+      
+      // Updating a booking (e.g., status) depends on the role
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.clientId || 
+        request.auth.uid == resource.data.therapistId || 
+        isAdmin()
+      );
+      
+      // Only Admins can delete bookings
+      allow delete: if isAdmin();
+    }
+
+    // 4. OTP Verifications Collection
+    match /otp_verifications/{email} {
+      // No client access. 
+      // OTPs are strictly managed by the Server Admin SDK.
+      allow read, write: if false;
+    }
+
+    // 5. Contact Submissions Collection
+    match /contact_submissions/{docId} {
+      // Clients can write (no auth required for contact form)
+      // We rely on backend rate limiting, but just in case:
+      // We actually write these from the backend API, so we block client writes 
+      allow read, write: if false; 
+    }
+
+    // 6. Generic Fallback
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

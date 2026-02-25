@@ -3,14 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, Clock, Check, CreditCard, Video, ChevronLeft, ChevronRight, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Check, CreditCard, Video, ChevronLeft, ChevronRight, Loader2, MapPin, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 
-import { format, addDays, subDays, startOfToday, isBefore, isToday, parse, isAfter } from 'date-fns';
+import { format, addDays, subDays, startOfToday, startOfDay, isBefore, isToday, parse, isAfter } from 'date-fns';
 import { BookingService } from '@/services/bookingService';
 import { TimeSlot } from '@/types';
-
+import { useRazorpay } from "react-razorpay";
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function BookingPage() {
@@ -18,6 +20,7 @@ export default function BookingPage() {
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
+    const { Razorpay: RazorpayInstance } = useRazorpay();
 
     // New State for Frequency and Multiple Slots
     const [sessionsPerWeek, setSessionsPerWeek] = useState(1);
@@ -26,6 +29,7 @@ export default function BookingPage() {
     // Data State
     const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
+    const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
 
     const [step, setStep] = useState(1); // 1: Select Slot, 2: Payment/Confirm
 
@@ -60,6 +64,34 @@ export default function BookingPage() {
         }
     }, [selectedDate, params.id]);
 
+    // Fetch dates the user has already booked (persists across refresh)
+    useEffect(() => {
+        const fetchBookedDates = async () => {
+            if (!user || !db) return;
+            try {
+                const bookingsRef = collection(db, 'bookings');
+                const q = query(
+                    bookingsRef,
+                    where('clientId', '==', user.id),
+                    where('sessionTime', '>=', Timestamp.fromDate(startOfDay(new Date())))
+                );
+                const snapshot = await getDocs(q);
+                const dates = new Set<string>();
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.status !== 'cancelled') {
+                        const sessionDate = data.sessionTime.toDate();
+                        dates.add(format(sessionDate, 'yyyy-MM-dd'));
+                    }
+                });
+                setBookedDates(dates);
+            } catch (error) {
+                console.error('Error fetching booked dates:', error);
+            }
+        };
+        fetchBookedDates();
+    }, [user]);
+
     // Mock Therapist Data (would fetch by ID)
     const therapist = {
         id: params.id,
@@ -93,10 +125,12 @@ export default function BookingPage() {
             // Deselect
             setSelectedSlots(prev => prev.filter(s => s !== exists));
         } else {
-            // Check if user already has a session selected for THIS date
+            // Check if user already has a session selected for THIS date (in-memory)
             const hasSessionForDate = selectedSlots.some(s => s.date === dateStr);
-            if (hasSessionForDate) {
-                alert("You can only book one session per day.");
+            // Check if user already has a booking for THIS date (from Firestore)
+            const hasExistingBooking = bookedDates.has(dateStr);
+            if (hasSessionForDate || hasExistingBooking) {
+                alert("You already have a session booked for this day. Only one session per day is allowed.");
                 return;
             }
 
@@ -137,9 +171,8 @@ export default function BookingPage() {
         }
         setIsSubmitting(true);
         try {
-            // Create a booking for each selected slot
+            // 1. Create bookings in Firestore as 'pending_payment'
             const bookingPromises = selectedSlots.map(slot => {
-                // Parse date and time to Date object
                 const [hours, minutes] = slot.time.split(':').map(Number);
                 const sessionTime = new Date(slot.date);
                 sessionTime.setHours(hours, minutes, 0, 0);
@@ -151,17 +184,64 @@ export default function BookingPage() {
                     clientName: user.name || 'User',
                     clientEmail: user.email || '',
                     sessionTime: sessionTime,
-                    duration: 60, // Default duration
+                    duration: 60,
                     amount: therapist.price,
+                    status: 'pending_payment',
+                    paymentStatus: 'pending'
                 });
             });
 
-            await Promise.all(bookingPromises);
+            const bookingIds = await Promise.all(bookingPromises);
 
-            alert(`Booking confirmed for ${selectedSlots.length} sessions!`);
-            router.push('/therapists');
+            // 2. Fetch Razorpay Order from Secure Backend (No GST)
+            const orderRes = await fetch('/api/payment/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    therapistId: therapist.id,
+                    sessionsCount: selectedSlots.length,
+                    uId: user.id,
+                    bookingIds // Essential for webhook mapping
+                })
+            });
+
+            const orderData = await orderRes.json();
+            if (!orderRes.ok) throw new Error(orderData.error || 'Failed to initialize payment');
+
+            // 3. Open Razorpay Modal
+            const options: any = {
+                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Safe to expose
+                amount: orderData.amount, // in paise
+                currency: orderData.currency,
+                name: "Arambh Clinic",
+                description: `Therapy Sessions: ${selectedSlots.length}x`,
+                order_id: orderData.id,
+                handler: function (response: any) {
+                    // Payment successful locally (Webhook will secure the backend)
+                    alert(`Payment Successful! Booking confirmed for ${selectedSlots.length} session(s).`);
+                    router.push('/client/bookings'); // or wherever dashboard is
+                },
+                prefill: {
+                    name: user.name || '',
+                    email: user.email || '',
+                },
+                theme: {
+                    color: "#4f6e5b" // Theme primary color
+                },
+            };
+
+            const rzp = new RazorpayInstance(options);
+
+            rzp.on('payment.failed', function (response: any) {
+                alert("Payment Failed. Please try again or contact support.");
+                // Webhook will not fire for success, so bookings remain pending_payment
+            });
+
+            rzp.open();
+
         } catch (error: any) {
-            alert("Booking Failed: " + (error.message || "Unknown error"));
+            console.error("Booking Flow Error:", error);
+            alert("Booking Failed: " + (error.message || "An unexpected error occurred."));
         } finally {
             setIsSubmitting(false);
         }
@@ -267,6 +347,12 @@ export default function BookingPage() {
                                         {loadingSlots ? (
                                             <div className="flex justify-center py-8">
                                                 <Loader2 className="w-8 h-8 text-[var(--primary-600)] animate-spin" />
+                                            </div>
+                                        ) : bookedDates.has(format(selectedDate, 'yyyy-MM-dd')) ? (
+                                            <div className="text-center py-8 bg-amber-50 rounded-lg border border-amber-200">
+                                                <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                                                <p className="text-amber-700 font-medium">You already have a session booked on this day.</p>
+                                                <p className="text-amber-600 text-sm mt-1">Only one session per day is allowed. Please select a different date.</p>
                                             </div>
                                         ) : availableSlots.length === 0 ? (
                                             <div className="text-center py-8 text-[var(--neutral-500)] bg-[var(--neutral-50)] rounded-lg">
@@ -375,9 +461,9 @@ export default function BookingPage() {
                                         </div>
                                         <div className="mt-3 pt-3 border-t border-[var(--warm-200)] flex justify-between items-center">
                                             <span className="font-bold text-lg text-[var(--primary-800)]">Total Due</span>
-                                            <span className="font-bold text-lg text-[var(--primary-800)]">₹{(totalCost * 1.18).toFixed(0)}</span>
+                                            <span className="font-bold text-lg text-[var(--primary-800)]">₹{totalCost}</span>
                                         </div>
-                                        <p className="text-xs text-[var(--neutral-500)] mt-2 italic">* Includes 18% GST. This starts your recurring weekly plan.</p>
+                                        <p className="text-xs text-[var(--neutral-500)] mt-2 italic">* This starts your recurring weekly plan.</p>
                                     </div>
 
                                     <button
