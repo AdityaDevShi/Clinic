@@ -21,9 +21,12 @@ export async function POST(req: Request) {
         }
 
         const therapistData = therapistDoc.data();
-        const pricePerSession = therapistData?.price;
+        // Check both 'price' and 'hourlyRate' fields, handle string values
+        const rawPrice = therapistData?.price || therapistData?.hourlyRate;
+        const pricePerSession = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice;
 
-        if (!pricePerSession || typeof pricePerSession !== 'number') {
+        if (!pricePerSession || isNaN(pricePerSession) || pricePerSession <= 0) {
+            console.error('Invalid price for therapist:', therapistId, 'data:', therapistData);
             return NextResponse.json({ error: 'Invalid price configuration for therapist' }, { status: 500 });
         }
 
