@@ -14,11 +14,13 @@ import { TimeSlot } from '@/types';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRazorpay } from 'react-razorpay';
 
 function BookingContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
+    const { Razorpay: RazorpayInstance } = useRazorpay();
 
     // Get therapistId from query param
     const therapistId = searchParams.get('therapistId');
@@ -185,9 +187,8 @@ function BookingContent() {
         }
         setIsSubmitting(true);
         try {
-            // Create a booking for each selected slot
+            // 1. Create bookings in Firestore as 'pending_payment'
             const bookingPromises = selectedSlots.map(slot => {
-                // Parse date and time to Date object
                 const [hours, minutes] = slot.time.split(':').map(Number);
                 const sessionTime = new Date(slot.date);
                 sessionTime.setHours(hours, minutes, 0, 0);
@@ -199,17 +200,63 @@ function BookingContent() {
                     clientName: user.name || 'User',
                     clientEmail: user.email || '',
                     sessionTime: sessionTime,
-                    duration: 60, // Default duration
+                    duration: 60,
                     amount: therapist.hourlyRate || therapist.price || 2500,
+                    status: 'pending_payment',
+                    paymentStatus: 'pending'
                 });
             });
 
-            await Promise.all(bookingPromises);
+            const bookingIds = await Promise.all(bookingPromises);
 
-            alert(`Booking confirmed for ${selectedSlots.length} sessions!`);
-            router.push('/therapists'); // Actually should go to dashboard maybe?
+            // 2. Fetch Razorpay Order from Secure Backend
+            const orderRes = await fetch('/api/payment/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    therapistId: therapist.id,
+                    sessionsCount: selectedSlots.length,
+                    uId: user.id,
+                    bookingIds
+                })
+            });
+
+            const orderData = await orderRes.json();
+            if (!orderRes.ok) throw new Error(orderData.error || 'Failed to initialize payment');
+
+            // 3. Open Razorpay Payment Modal
+            const options: any = {
+                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+                amount: orderData.amount,
+                currency: orderData.currency,
+                name: 'Arambh Clinic',
+                description: `Therapy Sessions: ${selectedSlots.length}x`,
+                order_id: orderData.id,
+                handler: function (response: any) {
+                    // Payment successful (Webhook will confirm on backend)
+                    alert(`Payment Successful! Booking confirmed for ${selectedSlots.length} session(s).`);
+                    router.push('/client/bookings');
+                },
+                prefill: {
+                    name: user.name || '',
+                    email: user.email || '',
+                },
+                theme: {
+                    color: '#4f6e5b'
+                },
+            };
+
+            const rzp = new RazorpayInstance(options);
+
+            rzp.on('payment.failed', function (response: any) {
+                alert('Payment Failed. Please try again or contact support.');
+            });
+
+            rzp.open();
+
         } catch (error: any) {
-            alert("Booking Failed: " + (error.message || "Unknown error"));
+            console.error('Booking Flow Error:', error);
+            alert('Booking Failed: ' + (error.message || 'An unexpected error occurred.'));
         } finally {
             setIsSubmitting(false);
         }
