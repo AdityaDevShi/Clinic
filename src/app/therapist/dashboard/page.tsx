@@ -88,15 +88,22 @@ export default function TherapistDashboardPage() {
     }, [selectedDate, rescheduleBooking]);
 
     const handleCancelBooking = async (bookingId: string) => {
-        if (!confirm("Are you sure you want to cancel this session?")) return;
+        if (!confirm("Are you sure you want to cancel this session? Any applicable refunds will be processed automatically.")) return;
         setIsProcessing(true);
         try {
-            await BookingService.cancelBooking(bookingId);
-            // Refresh data (simple workaround: reload or re-fetch. Since we use useEffect with user dep, maybe just manual refresh or optimistic update?
-            // For now, let's just alert. Ideally we'd trigger a reload of fetch.
-            window.location.reload(); // Simple refresh for now to see updates
+            const res = await fetch('/api/payment/cancel-booking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingId, requestingUid: user?.id })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to cancel booking');
+
+            alert(data.refunded ? "Session Cancelled. Refund initiated." : "Session Cancelled Successfully.");
+            window.location.reload();
         } catch (error: any) {
-            alert("Failed to cancel: " + error.message);
+            alert("Cancellation Failed: " + error.message);
         } finally {
             setIsProcessing(false);
         }
@@ -144,9 +151,7 @@ export default function TherapistDashboardPage() {
                             specialization: 'General Psychologist', // Default
                             bio: 'Welcome to my practice.',
                             hourlyRate: 1500, // Default price
-                            isOnline: true,
                             isEnabled: true,
-                            lastOnline: new Date(),
                             rating: 5.0,
                             reviewCount: 1,
                             languages: ['English'],
@@ -190,51 +195,18 @@ export default function TherapistDashboardPage() {
             }
         });
 
-        // State trackers for combined stats
-        let staticMinutes = 0;
-        let activeMinutes = 0;
-        let isCurrentlyOnline = false;
-
         let lastEarnings = 0;
         let lastAppointments = 0;
         let lastPatients = 0;
 
         const updateStats = () => {
-            const totalHours = parseFloat(((staticMinutes + activeMinutes) / 60).toFixed(1));
             setStats({
                 appointmentsToday: lastAppointments,
                 totalPatients: lastPatients,
-                hoursThisMonth: totalHours,
+                hoursThisMonth: 0, // Feature disabled
                 earningsThisMonth: lastEarnings
             });
         };
-
-        // Subscribe to Work Logs (Offline time chunks)
-        const logsQ = query(
-            collection(db, 'work_logs'),
-            where('therapistId', '==', user.id),
-            where('createdAt', '>=', Timestamp.fromDate(monthStart))
-        );
-        const unsubscribeLogs = onSnapshot(logsQ, (snap) => {
-            let mins = 0;
-            snap.forEach(d => mins += d.data().durationMinutes || 0);
-            staticMinutes = mins;
-            updateStats();
-        });
-
-        // Subscribe to Therapist Doc (Active session time)
-        const unsubscribeTherapist = onSnapshot(therapistRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data();
-                isCurrentlyOnline = !!data.isOnline;
-                if (data.isOnline && data.currentSessionStart) {
-                    activeMinutes = differenceInMinutes(new Date(), data.currentSessionStart.toDate());
-                } else {
-                    activeMinutes = 0;
-                }
-                updateStats();
-            }
-        });
 
         // Subscribe to Bookings
         const unsubscribeBookings = BookingService.subscribeToTherapistBookings(user.id, (bookings) => {
@@ -243,7 +215,7 @@ export default function TherapistDashboardPage() {
             lastAppointments = bookings.filter(b =>
                 isSameDay(b.sessionTime, now) &&
                 b.sessionTime > now &&
-                (b.status === 'confirmed' || b.status === 'pending')
+                (b.status === 'confirmed' || b.status === 'pending' || b.status === 'pending_payment')
             ).length;
 
             const uniquePatients = new Set(bookings.map(b => b.clientId));
@@ -251,7 +223,7 @@ export default function TherapistDashboardPage() {
 
             const upcomingBookingsList = bookings.filter(b =>
                 b.sessionTime > now &&
-                (b.status === 'confirmed' || b.status === 'pending')
+                b.status !== 'cancelled'
             );
             upcomingBookingsList.sort((a, b) => a.sessionTime.getTime() - b.sessionTime.getTime());
             setRecentBookings(upcomingBookingsList.slice(0, 5));
@@ -262,26 +234,17 @@ export default function TherapistDashboardPage() {
 
             lastEarnings = thisMonthBookings.reduce((acc, curr) => {
                 const amount = curr.amount || therapistHourlyRate;
-                return ['paid', 'confirmed', 'completed'].includes(curr.status) ? acc + amount : acc;
+                // Count earnings if payment was made (paymentStatus) or status indicates completion
+                const isPaid = (curr as any).paymentStatus === 'paid' || ['paid', 'confirmed', 'completed'].includes(curr.status);
+                return isPaid ? acc + amount : acc;
             }, 0);
 
             updateStats();
             setLoading(false);
         });
 
-        // Interval to update active minutes dynamically
-        const intervalId = setInterval(() => {
-            if (isCurrentlyOnline) {
-                activeMinutes++;
-                updateStats();
-            }
-        }, 60000);
-
         return () => {
             unsubscribeBookings();
-            unsubscribeLogs();
-            unsubscribeTherapist();
-            clearInterval(intervalId);
         };
     }, [user, authLoading, router]);
 
@@ -335,7 +298,7 @@ export default function TherapistDashboardPage() {
                         </motion.div>
 
                         {/* Stats Grid */}
-                        <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <motion.div variants={fadeInUp} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             <div className="bg-white rounded-xl p-5 shadow-sm">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="w-10 h-10 bg-[var(--primary-100)] rounded-full flex items-center justify-center">
@@ -356,15 +319,7 @@ export default function TherapistDashboardPage() {
                                 <p className="text-sm text-[var(--neutral-500)]">Total Patients</p>
                             </div>
 
-                            <div className="bg-white rounded-xl p-5 shadow-sm">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                        <Clock className="w-5 h-5 text-purple-600" />
-                                    </div>
-                                </div>
-                                <p className="text-2xl font-bold text-[var(--primary-700)]">{stats.hoursThisMonth}</p>
-                                <p className="text-sm text-[var(--neutral-500)]">Hours (Month)</p>
-                            </div>
+
 
                             <div className="bg-white rounded-xl p-5 shadow-sm">
                                 <div className="flex items-center justify-between mb-3">
