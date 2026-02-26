@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         });
 
         // 4. Build the reset link
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://clinic-f7125.web.app';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://arambh.net';
         const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
         // 5. Send the branded email
