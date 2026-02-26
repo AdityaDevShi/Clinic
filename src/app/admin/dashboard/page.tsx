@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
 
                 // Total revenue for the month
                 const totalRevenue = monthBookings
-                    .filter((b) => b.paymentStatus === 'paid')
+                    .filter((b) => b.paymentStatus === 'paid' || b.status === 'confirmed' || b.status === 'completed')
                     .reduce((acc, b) => acc + (b.amount || 0), 0);
 
                 // 3. precise Total Clients Count

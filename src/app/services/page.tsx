@@ -114,7 +114,7 @@ export default function ServicesPage() {
                             variants={fadeInUp}
                             className="text-lg text-[var(--neutral-600)] max-w-2xl mx-auto"
                         >
-                            Professional mental health services tailored to your unique needs.
+                            Professional mental health services tailored to your unique needs at <Link href="/" className="text-[var(--primary-600)] hover:underline font-medium">Arambh Mental Health Centre</Link>.
                             Every journey begins with a single step towards healing.
                         </motion.p>
                     </motion.div>

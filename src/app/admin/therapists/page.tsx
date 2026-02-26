@@ -94,9 +94,7 @@ export default function AdminTherapistsPage() {
                                 const data = doc.data();
                                 return {
                                     id: doc.id,
-                                    ...data,
-                                    // Safe date handling
-                                    lastOnline: data.lastOnline?.toDate ? data.lastOnline.toDate() : new Date(),
+                                    ...data
                                 };
                             } catch (err) {
                                 console.error(`Error processing therapist doc ${doc.id}:`, err);
@@ -159,9 +157,7 @@ export default function AdminTherapistsPage() {
                 hourlyRate: formData.hourlyRate,
                 qualifications: formData.qualifications.split(',').map((q) => q.trim()),
                 languages: formData.languages.split(',').map((l) => l.trim()),
-                isOnline: false,
                 isEnabled: true,
-                lastOnline: new Date(),
                 createdAt: serverTimestamp(),
             };
 
@@ -169,7 +165,7 @@ export default function AdminTherapistsPage() {
 
             setTherapists((prev) => [
                 ...prev,
-                { ...newTherapist, id: docRef.id, lastOnline: new Date() } as Therapist,
+                { ...newTherapist, id: docRef.id } as Therapist,
             ]);
 
             setShowAddModal(false);
@@ -294,9 +290,6 @@ export default function AdminTherapistsPage() {
                                                             }`}>
                                                             {therapist.isEnabled ? 'Active' : 'Disabled'}
                                                         </span>
-                                                        {therapist.isOnline && (
-                                                            <span className="w-2 h-2 rounded-full bg-green-500" />
-                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-6">

@@ -232,8 +232,27 @@ function BookingContent() {
                 name: 'Arambh Clinic',
                 description: `Therapy Sessions: ${selectedSlots.length}x`,
                 order_id: orderData.id,
-                handler: function (response: any) {
-                    // Payment successful (Webhook will confirm on backend)
+                handler: async function (response: any) {
+                    // Verify payment server-side — marks bookings as paid with transaction IDs
+                    try {
+                        const verifyRes = await fetch('/api/payment/verify-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature,
+                                bookingIds
+                            })
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (!verifyRes.ok) {
+                            console.error('Payment verification warning:', verifyData.error);
+                        }
+                    } catch (err) {
+                        // Webhook will still handle it; this is a best-effort fallback
+                        console.error('Payment verification request failed:', err);
+                    }
                     alert(`Payment Successful! Booking confirmed for ${selectedSlots.length} session(s).`);
                     router.push('/client/bookings');
                 },

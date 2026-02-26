@@ -55,6 +55,8 @@ export async function POST(req: Request) {
                             status: 'confirmed',
                             paymentStatus: 'paid',
                             paymentId: paymentEntity?.id || null,
+                            orderId: paymentEntity?.order_id || null,
+                            paidAt: new Date(),
                             updatedAt: new Date(),
                         });
                         hasValidBookings = true;

@@ -11,7 +11,7 @@ import { format, addDays, subDays, startOfToday, startOfDay, isBefore, isToday, 
 import { BookingService } from '@/services/bookingService';
 import { TimeSlot } from '@/types';
 import { useRazorpay } from "react-razorpay";
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -92,14 +92,34 @@ export default function BookingPage() {
         fetchBookedDates();
     }, [user]);
 
-    // Mock Therapist Data (would fetch by ID)
-    const therapist = {
-        id: params.id,
-        name: 'Dr. Shiwani Kohli',
-        specialization: 'Clinical Psychology',
-        price: 2500,
-        image: null // placeholder
-    };
+    // Therapist state — fetched from Firestore
+    const [therapist, setTherapist] = useState<any>(null);
+
+    // Fetch Therapist Data from Firestore
+    useEffect(() => {
+        async function fetchTherapist() {
+            if (!params.id) return;
+            try {
+                const docRef = doc(db, 'therapists', params.id as string);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setTherapist({ id: docSnap.id, ...docSnap.data() });
+                } else {
+                    // Fallback if therapist doc doesn't exist
+                    setTherapist({
+                        id: params.id,
+                        name: 'Therapist',
+                        specialization: 'Psychologist',
+                        price: 2500,
+                        hourlyRate: 2500
+                    });
+                }
+            } catch (e) {
+                console.error('Error fetching therapist', e);
+            }
+        }
+        fetchTherapist();
+    }, [params.id]);
 
     const handlePreviousDate = () => {
         const newDate = subDays(selectedDate, 1);
@@ -165,8 +185,8 @@ export default function BookingPage() {
     }
 
     const handleConfirmBooking = async () => {
-        if (!user) {
-            router.push(`/login?redirect=${encodeURIComponent(`/therapists/${params.id}/book`)}`);
+        if (!user || !therapist) {
+            if (!user) router.push(`/login?redirect=${encodeURIComponent(`/therapists/${params.id}/book`)}`);
             return;
         }
         setIsSubmitting(true);
@@ -185,7 +205,7 @@ export default function BookingPage() {
                     clientEmail: user.email || '',
                     sessionTime: sessionTime,
                     duration: 60,
-                    amount: therapist.price,
+                    amount: therapist.hourlyRate || therapist.price || 2500,
                     status: 'pending_payment',
                     paymentStatus: 'pending'
                 });
@@ -216,10 +236,28 @@ export default function BookingPage() {
                 name: "Arambh Clinic",
                 description: `Therapy Sessions: ${selectedSlots.length}x`,
                 order_id: orderData.id,
-                handler: function (response: any) {
-                    // Payment successful locally (Webhook will secure the backend)
+                handler: async function (response: any) {
+                    // Verify payment server-side — marks bookings as paid with transaction IDs
+                    try {
+                        const verifyRes = await fetch('/api/payment/verify-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature,
+                                bookingIds
+                            })
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (!verifyRes.ok) {
+                            console.error('Payment verification warning:', verifyData.error);
+                        }
+                    } catch (err) {
+                        console.error('Payment verification request failed:', err);
+                    }
                     alert(`Payment Successful! Booking confirmed for ${selectedSlots.length} session(s).`);
-                    router.push('/client/bookings'); // or wherever dashboard is
+                    router.push('/client/bookings');
                 },
                 prefill: {
                     name: user.name || '',
@@ -247,9 +285,16 @@ export default function BookingPage() {
         }
     };
 
-    const totalCost = therapist.price * selectedSlots.length; // Per week cost
+    const price = therapist ? (therapist.hourlyRate || therapist.price || 2500) : 0;
+    const totalCost = price * selectedSlots.length;
 
-    if (!isClient) return null; // Hydration fix
+    if (!isClient || !therapist) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
+                <Loader2 className="w-8 h-8 text-[var(--primary-500)] animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[var(--neutral-50)]">
@@ -449,7 +494,7 @@ export default function BookingPage() {
                                     <div className="p-4 bg-[var(--warm-50)] rounded-xl border border-[var(--warm-100)]">
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-[var(--neutral-600)]">Fee per session</span>
-                                            <span className="font-medium text-[var(--neutral-900)]">₹{therapist.price}</span>
+                                            <span className="font-medium text-[var(--neutral-900)]">₹{price}</span>
                                         </div>
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-[var(--neutral-600)]">Sessions per week</span>
@@ -494,7 +539,7 @@ export default function BookingPage() {
                             <h3 className="text-sm font-semibold text-[var(--neutral-500)] uppercase tracking-wider mb-4">You are booking</h3>
                             <div className="flex items-center gap-4 mb-4">
                                 <div className="w-16 h-16 bg-[var(--primary-100)] rounded-full flex items-center justify-center text-xl font-serif text-[var(--primary-700)]">
-                                    {therapist.name.split(' ').map(n => n[0]).join('')}
+                                    {therapist.name.split(' ').map((n: string) => n[0]).join('')}
                                 </div>
                                 <div>
                                     <h4 className="font-serif text-lg text-[var(--primary-800)] leading-tight">{therapist.name}</h4>

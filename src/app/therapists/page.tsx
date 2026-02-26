@@ -42,7 +42,6 @@ export default function TherapistsPage() {
     const [allTherapists, setAllTherapists] = useState<Therapist[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('All Specializations');
-    const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
     useEffect(() => {
         // Try to fetch from Firebase
@@ -61,9 +60,7 @@ export default function TherapistsPage() {
                             console.log(`Therapist ${doc.id} photoUrl:`, data.photoUrl);
                             return {
                                 id: doc.id,
-                                ...data,
-                                // Safe date handling to prevent crashes
-                                lastOnline: data.lastOnline?.toDate ? data.lastOnline.toDate() : new Date(),
+                                ...data
                             };
                         } catch (err) {
                             console.error(`Error processing therapist doc ${doc.id}:`, err);
@@ -97,10 +94,6 @@ export default function TherapistsPage() {
 
     // Compute visible therapists from base list - NEVER mutate allTherapists
     const visibleTherapists = allTherapists.filter((therapist) => {
-        // Online filter
-        if (showOnlineOnly && !therapist.isOnline) {
-            return false;
-        }
         // Specialization filter
         if (filter !== 'All Specializations' && therapist.specialization !== filter) {
             return false;
@@ -149,18 +142,6 @@ export default function TherapistsPage() {
                                 ))}
                             </select>
                         </div>
-
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={showOnlineOnly}
-                                onChange={(e) => setShowOnlineOnly(e.target.checked)}
-                                className="w-4 h-4 rounded border-[var(--border)] text-[var(--secondary-500)] focus:ring-[var(--secondary-500)]"
-                            />
-                            <span className="text-sm text-[var(--neutral-600)]">
-                                Show online therapists only
-                            </span>
-                        </label>
                     </div>
                 </div>
             </section>
@@ -188,7 +169,6 @@ export default function TherapistsPage() {
                             <button
                                 onClick={() => {
                                     setFilter('All Specializations');
-                                    setShowOnlineOnly(false);
                                 }}
                                 className="mt-4 text-[var(--secondary-600)] hover:text-[var(--secondary-700)] font-medium"
                             >
@@ -197,7 +177,7 @@ export default function TherapistsPage() {
                         </div>
                     ) : (
                         <motion.div
-                            key={`${filter}-${showOnlineOnly}`}
+                            key={filter}
                             initial="hidden"
                             animate="visible"
                             variants={staggerContainer}
@@ -220,9 +200,6 @@ export default function TherapistsPage() {
                                                 </span>
                                             )}
                                         </div>
-                                        {/* Online Status Dot */}
-                                        <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white ${therapist.isOnline ? 'bg-green-500' : 'bg-gray-300'
-                                            }`} />
                                     </div>
 
                                     {/* Name & Specialization */}
@@ -260,11 +237,6 @@ export default function TherapistsPage() {
 
                                         return <div className="h-7 mb-3"></div>;
                                     })()}
-
-                                    {/* Status Text */}
-                                    <p className={`text-xs font-medium mb-4 ${therapist.isOnline ? 'text-green-600' : 'text-gray-400'}`}>
-                                        {therapist.isOnline ? 'Available Now' : 'Currently Offline'}
-                                    </p>
 
                                     {/* Bio Snippet */}
                                     <p className="text-sm text-[var(--neutral-600)] mb-4 line-clamp-2 px-2">

@@ -199,8 +199,8 @@ export const BookingService = {
                 ...bookingData,
                 sessionTime: Timestamp.fromDate(bookingData.sessionTime!),
                 createdAt: Timestamp.now(),
-                status: 'confirmed', // Auto-confirm for now
-                paymentStatus: 'paid' // Assuming payment flow is separate/mocked
+                status: bookingData.status || 'pending_payment',
+                paymentStatus: bookingData.paymentStatus || 'pending'
             });
 
             return docRef.id;

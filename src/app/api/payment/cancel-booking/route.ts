@@ -36,7 +36,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized to cancel this booking' }, { status: 403 });
         }
 
-        // 4. Time Check (24-Hour Rule for Clients)
+        // 4. Time Check (24-Hour Rule for Clients — affects refund eligibility only)
+        let isLateCancel = false;
         if (role === 'client') {
             const sessionTime = bookingData?.sessionTime?.toDate();
             if (!sessionTime) {
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
             const hoursUntilSession = timeDifferenceInMs / (1000 * 60 * 60);
 
             if (hoursUntilSession < 24) {
-                return NextResponse.json({ error: 'Clients cannot cancel sessions less than 24 hours in advance' }, { status: 403 });
+                // Late cancellation — session is cancelled but NO refund
+                isLateCancel = true;
             }
         }
 
@@ -58,19 +60,22 @@ export async function POST(req: Request) {
 
         let refundId = null;
 
-        if (paymentStatus === 'paid' && paymentId) {
+        // Only refund if: payment was made AND (not a late cancel, OR requester is therapist/admin)
+        const eligibleForRefund = paymentStatus === 'paid' && paymentId && (!isLateCancel || role !== 'client');
+
+        if (eligibleForRefund) {
             // 6. Initiate Razorpay Refund
             const instance = new Razorpay({
                 key_id: process.env.RAZORPAY_KEY_ID as string,
                 key_secret: process.env.RAZORPAY_KEY_SECRET as string,
             });
 
-            console.log(`Processing automatic refund for payment: ${paymentId}`);
+            console.log(`Processing refund for payment: ${paymentId} (cancelled by ${role})`);
             const refund = await instance.payments.refund(paymentId, {
                 notes: {
                     bookingId,
                     cancelledBy: role,
-                    reason: 'Automated 24h cancellation'
+                    reason: isLateCancel ? 'Late cancellation (no refund for client)' : 'Cancellation with refund'
                 }
             });
 
@@ -82,10 +87,23 @@ export async function POST(req: Request) {
             status: 'cancelled',
             paymentStatus: refundId ? 'refunded' : paymentStatus,
             refundId: refundId || null,
+            cancelledBy: role,
+            cancelledAt: new Date(),
+            isLateCancel: isLateCancel,
             updatedAt: new Date()
         });
 
-        return NextResponse.json({ success: true, refunded: !!refundId, refundId });
+        return NextResponse.json({
+            success: true,
+            refunded: !!refundId,
+            refundId,
+            lateCancel: isLateCancel,
+            message: isLateCancel
+                ? 'Session cancelled. No refund as cancellation was within 24 hours of the session.'
+                : refundId
+                    ? 'Session cancelled. Refund has been initiated.'
+                    : 'Session cancelled successfully.'
+        });
 
     } catch (error) {
         console.error('Error in secure cancellation process:', error);
