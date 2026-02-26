@@ -99,9 +99,9 @@ export async function POST(req: Request) {
             refundId,
             lateCancel: isLateCancel,
             message: isLateCancel
-                ? 'Session cancelled. No refund as cancellation was within 24 hours of the session.'
+                ? 'Session cancelled. No refund is applicable as the cancellation was made within 24 hours of the session.'
                 : refundId
-                    ? 'Session cancelled. Refund has been initiated.'
+                    ? 'Session cancelled. Refund has been initiated and will be credited to your account within 5-7 business days.'
                     : 'Session cancelled successfully.'
         });
 
