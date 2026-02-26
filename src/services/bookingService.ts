@@ -142,7 +142,7 @@ export const BookingService = {
         // Check if any booking exists that is NOT cancelled and NOT the excluded one
         return snapshot.docs.some(doc => {
             const data = doc.data();
-            if (data.status === 'cancelled') return false;
+            if (data.status === 'cancelled' || data.status === 'pending_payment') return false;
             if (excludeBookingId && doc.id === excludeBookingId) return false;
             return true;
         });
@@ -174,7 +174,7 @@ export const BookingService = {
             ]);
 
             const isConflict = existingBookings.some(b => {
-                if (b.status === 'cancelled') return false;
+                if (b.status === 'cancelled' || b.status === 'pending_payment') return false;
                 const bStart = b.sessionTime;
                 return bStart.getTime() === start.getTime(); // Exact match check for slot system
             });
