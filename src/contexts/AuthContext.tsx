@@ -26,64 +26,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Track active presence interval to avoid duplicates
-let heartbeatInterval: NodeJS.Timeout | null = null;
-let currentTherapistId: string | null = null;
-
-const handleBeforeUnload = () => {
-    if (currentTherapistId) {
-        try {
-            // Explicitly mark this as an unload event so the serverless function handles it immediately
-            const data = JSON.stringify({ therapistId: currentTherapistId, isUnload: true });
-            navigator.sendBeacon('/api/presence/offline', data);
-        } catch (e) {
-            console.error('sendBeacon failed:', e);
-        }
-    }
-};
-
-/**
- * Starts a periodic heartbeat to the server API to maintain online presence.
- */
-function startHeartbeat(therapistId: string) {
-    if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-    }
-    currentTherapistId = therapistId;
-
-    // Send immediately on login
-    sendHeartbeat(therapistId);
-
-    // Ping every 15 seconds to ensure we stay well under the 35s server death threshold
-    heartbeatInterval = setInterval(() => {
-        if (currentTherapistId === therapistId) {
-            sendHeartbeat(therapistId);
-        }
-    }, 15000);
-
-    // Only trigger immediate offline when the user actually closes the tab or refreshes.
-    // 'beforeunload' works most consistently across desktop and mobile production environments.
-    window.addEventListener('beforeunload', handleBeforeUnload);
-}
-
-function stopHeartbeat() {
-    if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = null;
-    }
-    currentTherapistId = null;
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-}
-
-function sendHeartbeat(therapistId: string) {
-    fetch('/api/presence/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ therapistId }),
-        keepalive: true
-    }).catch((e) => console.error('Heartbeat failed:', e));
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
@@ -101,7 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Force logout for blocked admin
             if (firebaseUser && firebaseUser.email === 'a@gmail.com') {
                 await signOut(auth);
-                stopHeartbeat();
                 setFirebaseUser(null);
                 setUser(null);
                 setLoading(false);
@@ -133,11 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             photoUrl: userData.photoUrl,
                         };
                         setUser(resolvedUser);
-
-                        // Start sending heartbeats to API
-                        if (role === 'therapist') {
-                            startHeartbeat(firebaseUser.uid);
-                        }
                     } else {
                         // User exists in Auth but not in Firestore (restore missing doc)
                         if (firebaseUser.email === 'care@arambh.net') {
@@ -188,20 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const firebaseUser = userCredential.user;
-
-            // Fetch user role to determine if we need to update therapist status
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-            if (userDoc.exists() && userDoc.data().role === 'therapist') {
-                // Set online status immediately on login (heartbeat will maintain it)
-
-                // Set online status
-                const therapistRef = doc(db, 'therapists', firebaseUser.uid);
-                await setDoc(therapistRef, {
-                    isOnline: true,
-                    lastOnline: serverTimestamp(),
-                    currentSessionStart: serverTimestamp()
-                }, { merge: true });
-            }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to login';
             setError(errorMessage);
@@ -220,43 +142,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const firebaseUser = userCredential.user;
-            let role: UserRole = 'client';
 
-            // Auto-promote specific email to admin
-            if (email === 'care@arambh.net') {
-                role = 'admin';
-            } else {
-                // Check for pre-existing therapist invite
-                const therapistsRef = collection(db, 'therapists');
-                const q = query(therapistsRef, where('email', '==', email));
-                const querySnapshot = await getDocs(q);
+            // 1. Get the Firebase ID token
+            const idToken = await firebaseUser.getIdToken();
 
-                if (!querySnapshot.empty) {
-                    const inviteDoc = querySnapshot.docs[0];
-                    const inviteData = inviteDoc.data();
+            // 2. Call our secure backend to handle role assignment and Firestore document creation
+            const response = await fetch('/api/auth/register-profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}` // Pass token for backend verification
+                },
+                body: JSON.stringify({
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    name: name
+                })
+            });
 
-                    console.log('Found therapist invite, linking account...');
-                    role = 'therapist';
-
-                    // Migrate pre-filled data to the new Auth UID document
-                    await setDoc(doc(db, 'therapists', firebaseUser.uid), {
-                        ...inviteData,
-                        id: firebaseUser.uid, // IMPORTANT: The doc ID must match Auth UID
-                        updatedAt: serverTimestamp()
-                    });
-
-                    // Delete the temporary admin-created document
-                    await deleteDoc(inviteDoc.ref);
-                }
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create user profile securely');
             }
 
-            // Create user document in Firestore
-            await setDoc(doc(db, 'users', firebaseUser.uid), {
-                email: firebaseUser.email,
-                name,
-                role,
-                createdAt: serverTimestamp(),
-            });
+
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to sign up';
             setError(errorMessage);
@@ -272,49 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setError(null);
         try {
-            // Set offline before signing out (if user is currently logged in as therapist)
-            // We can check the local 'user' state
-            if (user && user.role === 'therapist') {
-                try {
-                    const therapistRef = doc(db, 'therapists', user.id);
-
-                    // Fetch to get session start for logging work
-                    const currentDoc = await getDoc(therapistRef);
-                    if (currentDoc.exists()) {
-                        const data = currentDoc.data();
-                        // Only if currently online
-                        if (data.isOnline) {
-                            const sessionStart = data.currentSessionStart;
-                            if (sessionStart) {
-                                const startTime = sessionStart.toDate();
-                                const endTime = new Date();
-                                const duration = differenceInMinutes(endTime, startTime);
-
-                                if (duration > 0) {
-                                    await addDoc(collection(db, 'work_logs'), {
-                                        therapistId: user.id,
-                                        startTime: sessionStart,
-                                        endTime: Timestamp.fromDate(endTime),
-                                        durationMinutes: duration,
-                                        createdAt: serverTimestamp()
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    await setDoc(therapistRef, {
-                        isOnline: false,
-                        lastOnline: serverTimestamp(),
-                        currentSessionStart: null
-                    }, { merge: true });
-                } catch (e) {
-                    console.error("Failed to update offline status", e);
-                }
-            }
-
             await signOut(auth);
-            stopHeartbeat();
             setUser(null);
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to logout';

@@ -206,13 +206,21 @@ export default function ClientBookingsPage() {
     };
 
     const handleCancelBooking = async (bookingId: string) => {
-        if (!confirm("Are you sure you want to cancel this session?")) return;
+        if (!confirm("Are you sure you want to cancel this session? If eligible, your refund will be automatically processed.")) return;
 
         try {
-            await BookingService.cancelBooking(bookingId);
-            // Optional: Optimistic update or wait for snapshot
+            const res = await fetch('/api/payment/cancel-booking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingId, requestingUid: user?.id })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to cancel booking');
+
+            alert(data.message || "Session Cancelled Successfully.");
         } catch (error: any) {
-            alert("Failed to cancel: " + error.message);
+            alert("Cancellation Failed: " + error.message);
         }
     };
 

@@ -19,10 +19,8 @@ export interface Therapist {
     specialization: string;
     bio: string;
     photoUrl?: string;
-    isOnline: boolean;
     isEnabled: boolean;
     hourlyRate: number;
-    lastOnline: Date;
     qualifications?: string[];
     languages?: string[];
     rating?: number;
@@ -66,7 +64,7 @@ export interface BusySlot {
 }
 
 // Booking status
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type BookingStatus = 'pending_payment' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'refunded';
 
 // Booking type

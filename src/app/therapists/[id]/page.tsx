@@ -48,10 +48,8 @@ const demoTherapists: Record<string, Therapist> = {
         specialization: 'Clinical Psychology',
         bio: 'Clinical Psychologist with over 10 years of experience in treating anxiety disorders, depression, trauma, and stress-related conditions. Dr. Kohli uses an integrative approach combining Cognitive Behavioral Therapy (CBT), mindfulness techniques, and person-centered therapy to help clients achieve lasting positive change.\n\nHer warm and empathetic approach creates a safe space for clients to explore their challenges and develop effective coping strategies. She is passionate about mental health awareness and believes in empowering individuals to take charge of their emotional well-being.',
         photoUrl: undefined,
-        isOnline: true,
         isEnabled: true,
         hourlyRate: 2500,
-        lastOnline: new Date(),
         qualifications: ['M.Phil Clinical Psychology', 'CBT Certified', 'Trauma-Informed Care'],
         languages: ['English', 'Hindi'],
     },
@@ -62,10 +60,8 @@ const demoTherapists: Record<string, Therapist> = {
         specialization: 'Child & Adolescent Psychology',
         bio: 'Specialized in working with children and teenagers facing emotional, behavioral, and developmental challenges. Dr. Sharma uses play therapy, art therapy, and CBT approaches tailored for young minds.\n\nWith a gentle and patient approach, she helps young clients express themselves and develop healthy coping mechanisms. She works closely with parents to create supportive home environments.',
         photoUrl: undefined,
-        isOnline: true,
         isEnabled: true,
         hourlyRate: 2000,
-        lastOnline: new Date(),
         qualifications: ['Ph.D. Child Psychology', 'Play Therapy Certified', 'Child Development Specialist'],
         languages: ['English', 'Hindi', 'Punjabi'],
     },
@@ -76,10 +72,8 @@ const demoTherapists: Record<string, Therapist> = {
         specialization: 'Couples & Family Therapy',
         bio: 'Expert in relationship counseling and family dynamics with over 8 years of experience. Dr. Verma helps couples improve communication, resolve conflicts, and strengthen their emotional bond.\n\nHe specializes in premarital counseling, marriage therapy, and family mediation. His approach is collaborative and solution-focused, helping families navigate transitions and challenges together.',
         photoUrl: undefined,
-        isOnline: false,
         isEnabled: true,
         hourlyRate: 3500,
-        lastOnline: new Date(Date.now() - 3600000),
         qualifications: ['M.A. Clinical Psychology', 'Certified Couples Therapist', 'Family Systems Training'],
         languages: ['English', 'Hindi'],
     },
@@ -186,8 +180,7 @@ export default function TherapistProfilePage() {
                 console.log("Real-time Therapist Data Update:", data.rating, data.reviewCount);
                 setTherapist({
                     id: docSnapshot.id,
-                    ...data,
-                    lastOnline: data.lastOnline?.toDate() || new Date(),
+                    ...data
                 } as Therapist);
                 setLoading(false);
             } else {
@@ -306,8 +299,6 @@ export default function TherapistProfilePage() {
                                                 {therapist.name.split(' ').map(n => n[0]).join('')}
                                             </span>
                                         </div>
-                                        <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white ${therapist.isOnline ? 'bg-green-500' : 'bg-[var(--neutral-300)]'
-                                            }`} />
                                     </div>
 
                                     <div className="flex-1">
@@ -330,12 +321,7 @@ export default function TherapistProfilePage() {
                                                     </span>
                                                 </div>
                                             )}
-                                            <div className="flex items-center">
-                                                <Clock className="w-4 h-4 mr-1" />
-                                                <span className={therapist.isOnline ? 'text-green-600' : ''}>
-                                                    {therapist.isOnline ? 'Available Now' : 'Currently Offline'}
-                                                </span>
-                                            </div>
+
                                         </div>
                                     </div>
                                 </motion.div>
@@ -463,7 +449,7 @@ export default function TherapistProfilePage() {
                                         <div className="w-8 h-8 rounded-full bg-[var(--neutral-50)] flex items-center justify-center">
                                             <Calendar className="w-4 h-4 text-[var(--primary-500)]" />
                                         </div>
-                                        <span>Available {therapist.isOnline ? 'Now' : 'by Appointment'}</span>
+                                        <span>Available by Appointment</span>
                                     </div>
                                 </div>
 
@@ -474,11 +460,9 @@ export default function TherapistProfilePage() {
                                     Book Session
                                 </Link>
 
-                                {!therapist.isOnline && (
-                                    <p className="text-sm text-center text-[var(--neutral-500)] mt-3">
-                                        Next available slot: Tomorrow, 10:00 AM
-                                    </p>
-                                )}
+                                <p className="text-sm text-center text-[var(--neutral-500)] mt-3">
+                                    Next available slot: Tomorrow, 10:00 AM
+                                </p>
                             </motion.div>
                         </div>
                     </div>

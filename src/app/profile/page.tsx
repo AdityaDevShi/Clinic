@@ -141,8 +141,7 @@ function ProfileContent() {
                 const data = docSnapshot.data();
                 setTherapist({
                     id: docSnapshot.id,
-                    ...data,
-                    lastOnline: data.lastOnline?.toDate() || new Date(),
+                    ...data
                 } as Therapist);
             } else {
                 setTherapist(null);
@@ -263,11 +262,6 @@ function ProfileContent() {
                                             {therapist.name.split(' ').map(n => n[0]).join('')}
                                         </div>
                                     )}
-                                </div>
-                                {/* Online Badge */}
-                                <div className={`absolute bottom-4 right-4 md:bottom-6 md:right-6 px-3 py-1 rounded-full text-xs font-bold text-white shadow-md border-2 border-white ${therapist.isOnline ? 'bg-green-500' : 'bg-gray-400'
-                                    }`}>
-                                    {therapist.isOnline ? 'ONLINE' : 'OFFLINE'}
                                 </div>
                             </div>
                         </motion.div>

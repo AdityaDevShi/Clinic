@@ -138,9 +138,9 @@ export default function HomePage() {
           >
             <motion.h2
               variants={fadeInUp}
-              className="font-serif text-3xl md:text-4xl text-[var(--primary-700)] mb-4"
+              className="font-serif text-3xl md:text-4xl text-[var(--primary-700)] mb-4 leading-tight"
             >
-              About Us
+              Online Mental Health Counselling <br className="hidden md:block" /> with a Licensed Clinical Psychologist
             </motion.h2>
 
             <motion.div variants={fadeInUp} className="section-divider mb-8" />
@@ -149,9 +149,7 @@ export default function HomePage() {
               variants={fadeInUp}
               className="text-[var(--neutral-600)] leading-relaxed text-lg"
             >
-              Welcome to <strong className="text-[var(--primary-600)]">Arambh Mental Health Centre</strong>.
-              Led by Registered Clinical Psychologist, <strong className="text-[var(--primary-600)]">Shiwani Kohli</strong>, we provide compassionate and confidential psychological support
-              to help individuals find clarity and emotional balance.
+              <strong className="text-[var(--primary-600)]">Arambh</strong> offers <Link href="/online-mental-health-counselling-india" className="text-[var(--primary-600)] hover:underline font-semibold">online mental health counselling in India</Link>, providing confidential therapy sessions with a registered clinical psychologist. We support individuals, children, couples, and students dealing with anxiety, depression, stress, emotional difficulties, and relationship concerns through evidence-based psychological care.
             </motion.p>
           </motion.div>
         </div>
@@ -207,8 +205,11 @@ export default function HomePage() {
             whileInView="visible"
             viewport={{ once: true }}
             variants={fadeInUp}
-            className="text-center mt-10"
+            className="text-center mt-12 max-w-4xl mx-auto"
           >
+            <p className="text-[var(--neutral-600)] text-lg leading-relaxed mb-8">
+              At Arambh, our <Link href="/services" className="text-[var(--primary-600)] hover:underline font-medium">online therapy services</Link> include individual counselling for anxiety and depression, child and adolescent therapy, couples counselling, and professional supervision for psychology students. All sessions are conducted online, ensuring privacy, accessibility, and consistent mental health support.
+            </p>
             <Link
               href="/services"
               className="inline-flex items-center text-[var(--primary-600)] hover:text-[var(--primary-700)] font-medium group"
@@ -242,10 +243,16 @@ export default function HomePage() {
             <motion.div variants={fadeInUp} className="section-divider mb-8" />
             <motion.p
               variants={fadeInUp}
-              className="text-lg text-[var(--neutral-600)] max-w-3xl mx-auto"
+              className="text-lg text-[var(--neutral-600)] max-w-3xl mx-auto mb-4"
             >
               Clinical psychologists can help manage emotional, behavioral, and cognitive difficulties.
               Seeking professional support is a sign of strength, not weakness.
+            </motion.p>
+            <motion.p
+              variants={fadeInUp}
+              className="text-lg text-[var(--primary-700)] max-w-3xl mx-auto font-medium"
+            >
+              At Arambh Mental Health Centre, these concerns are addressed through personalized therapy sessions guided by a licensed clinical psychologist.
             </motion.p>
           </motion.div>
 

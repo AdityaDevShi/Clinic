@@ -100,7 +100,7 @@ export default function TherapistDashboardPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to cancel booking');
 
-            alert(data.refunded ? "Session Cancelled. Refund initiated." : "Session Cancelled Successfully.");
+            alert(data.message || (data.refunded ? "Session Cancelled. Refund initiated." : "Session Cancelled Successfully."));
             window.location.reload();
         } catch (error: any) {
             alert("Cancellation Failed: " + error.message);
@@ -228,14 +228,16 @@ export default function TherapistDashboardPage() {
             upcomingBookingsList.sort((a, b) => a.sessionTime.getTime() - b.sessionTime.getTime());
             setRecentBookings(upcomingBookingsList.slice(0, 5));
 
-            const thisMonthBookings = bookings.filter(b =>
-                b.sessionTime >= monthStart && b.sessionTime <= monthEnd
-            );
+            // Earnings based on when the booking was PAID (createdAt), not when the session happens
+            const thisMonthBookings = bookings.filter(b => {
+                const bookingDate = b.createdAt || b.sessionTime;
+                return bookingDate >= monthStart && bookingDate <= monthEnd;
+            });
 
             lastEarnings = thisMonthBookings.reduce((acc, curr) => {
                 const amount = curr.amount || therapistHourlyRate;
-                // Count earnings if payment was made (paymentStatus) or status indicates completion
-                const isPaid = (curr as any).paymentStatus === 'paid' || ['paid', 'confirmed', 'completed'].includes(curr.status);
+                // Count earnings for paid/confirmed/completed bookings
+                const isPaid = curr.paymentStatus === 'paid' || ['confirmed', 'completed'].includes(curr.status);
                 return isPaid ? acc + amount : acc;
             }, 0);
 
