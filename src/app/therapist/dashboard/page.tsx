@@ -215,7 +215,7 @@ export default function TherapistDashboardPage() {
             lastAppointments = bookings.filter(b =>
                 isSameDay(b.sessionTime, now) &&
                 b.sessionTime > now &&
-                (b.status === 'confirmed' || b.status === 'pending' || b.status === 'pending_payment')
+                (b.status === 'confirmed' || b.status === 'pending')
             ).length;
 
             const uniquePatients = new Set(bookings.map(b => b.clientId));
