@@ -156,7 +156,7 @@ export default function ClientBookingsPage() {
     }, [selectedDate, rescheduleBooking]);
 
     const upcomingBookings = bookings.filter(
-        (b) => isFuture(b.sessionTime) && b.status !== 'cancelled'
+        (b) => isFuture(b.sessionTime) && b.status !== 'cancelled' && b.status !== 'pending_payment'
     );
     const pastBookings = bookings.filter(
         (b) => isPast(b.sessionTime) || b.status === 'completed' || b.status === 'cancelled'

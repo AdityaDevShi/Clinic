@@ -104,7 +104,7 @@ function BookingContent() {
                 const dates = new Set<string>();
                 snapshot.docs.forEach(doc => {
                     const data = doc.data();
-                    if (data.status !== 'cancelled') {
+                    if (data.status !== 'cancelled' && data.status !== 'pending_payment') {
                         const sessionDate = data.sessionTime.toDate();
                         dates.add(format(sessionDate, 'yyyy-MM-dd'));
                     }
