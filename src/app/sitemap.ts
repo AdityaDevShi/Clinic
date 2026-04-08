@@ -73,6 +73,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'monthly',
             priority: 0.5,
         },
+        {
+            url: `${baseUrl}/blog`,
+            lastModified: new Date(),
+            changeFrequency: 'daily',
+            priority: 0.8,
+        },
     ];
 
     // Dynamic therapist profile pages via Firestore REST API
@@ -98,9 +104,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                     );
                 })
                 .map((doc: any) => {
-                    const docId = doc.name.split('/').pop();
+                    const name = doc.fields?.name?.stringValue || '';
+                    const slug = name
+                        .toLowerCase()
+                        .replace(/^(dr\.|mr\.|ms\.|mrs\.|prof\.)\s*/i, '')
+                        .trim()
+                        .replace(/[^a-z0-9\s-]/g, '')
+                        .replace(/\s+/g, '-')
+                        .replace(/-+/g, '-')
+                        .replace(/^-|-$/g, '');
                     return {
-                        url: `${baseUrl}/profile?id=${docId}`,
+                        url: `${baseUrl}/therapists/${slug}`,
                         lastModified: new Date(),
                         changeFrequency: 'weekly' as const,
                         priority: 0.8,
@@ -111,5 +125,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         console.error('Error fetching therapists for sitemap:', error);
     }
 
-    return [...staticPages, ...therapistPages];
+    // Dynamic blog post pages via Firestore REST API
+    let blogPages: MetadataRoute.Sitemap = [];
+    try {
+        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'clinic-f7125';
+        const blogRes = await fetch(
+            `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/blog_posts`,
+            { next: { revalidate: 3600 } }
+        );
+
+        if (blogRes.ok) {
+            const blogData = await blogRes.json();
+            const blogDocs = blogData.documents || [];
+
+            blogPages = blogDocs.map((doc: any) => {
+                const slug = doc.fields?.slug?.stringValue;
+                if (!slug) return null;
+                return {
+                    url: `${baseUrl}/blog/${slug}`,
+                    lastModified: new Date(),
+                    changeFrequency: 'weekly' as const,
+                    priority: 0.7,
+                };
+            }).filter(Boolean);
+        }
+    } catch (error) {
+        console.error('Error fetching blog posts for sitemap:', error);
+    }
+
+    return [...staticPages, ...therapistPages, ...blogPages];
 }
