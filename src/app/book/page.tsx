@@ -5,6 +5,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, Clock, Check, CreditCard, Video, ChevronLeft, ChevronRight, Loader2, MapPin, XCircle, AlertCircle } from 'lucide-react';
+import ConsentFormModal from '@/components/ui/ConsentFormModal';
 import Link from 'next/link';
 
 
@@ -14,6 +15,7 @@ import { TimeSlot } from '@/types';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toSlug } from '@/lib/slugify';
 import { useRazorpay } from 'react-razorpay';
 
 function BookingContent() {
@@ -32,6 +34,7 @@ function BookingContent() {
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showConsentModal, setShowConsentModal] = useState(false);
     const [therapist, setTherapist] = useState<any>(null); // Quick type for now
     const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
 
@@ -201,7 +204,7 @@ function BookingContent() {
                     clientEmail: user.email || '',
                     sessionTime: sessionTime,
                     duration: 60,
-                    amount: therapist.hourlyRate || therapist.price || 2500,
+                    amount: price,
                     status: 'pending_payment',
                     paymentStatus: 'pending'
                 });
@@ -253,8 +256,34 @@ function BookingContent() {
                         // Webhook will still handle it; this is a best-effort fallback
                         console.error('Payment verification request failed:', err);
                     }
-                    alert(`Payment Successful! Booking confirmed for ${selectedSlots.length} session(s).`);
-                    router.push('/client/bookings');
+                    // Google Ads conversion tracking
+                    const proceedToBookings = () => {
+                        alert(`Payment Successful! Booking confirmed for ${selectedSlots.length} session(s).`);
+                        router.push('/client/bookings');
+                    };
+
+                    if (typeof window !== 'undefined' && (window as any).gtag) {
+                        let callbackFired = false;
+                        const gtagCallback = () => {
+                            if (!callbackFired) {
+                                callbackFired = true;
+                                proceedToBookings();
+                            }
+                        };
+                        
+                        // Fallback timeout in case gtag is blocked by adblockers
+                        setTimeout(gtagCallback, 1000);
+
+                        (window as any).gtag('event', 'conversion', {
+                            'send_to': 'AW-17986636182/NtG0COCKpoEcEJaT2YBD', 
+                            'value': price * selectedSlots.length,
+                            'currency': 'INR',
+                            'transaction_id': orderData.id, // Prevents duplicate counting
+                            'event_callback': gtagCallback
+                        });
+                    } else {
+                        proceedToBookings();
+                    }
                 },
                 prefill: {
                     name: user.name || '',
@@ -306,7 +335,8 @@ function BookingContent() {
         return <div className="p-20 text-center">Invalid Therapist ID</div>;
     }
 
-    const price = therapist ? (therapist.hourlyRate || therapist.price || 2500) : 0;
+    const originalPrice = therapist ? (therapist.hourlyRate || therapist.price || 2500) : 0;
+    const price = therapist?.discountEnabled && therapist?.discountedRate && therapist.discountedRate < originalPrice ? therapist.discountedRate : originalPrice;
     const totalCost = price * selectedSlots.length;
 
     return (
@@ -315,7 +345,7 @@ function BookingContent() {
 
             <div className="pt-24 md:pt-32 pb-12 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Back Link */}
-                <Link href={`/profile?id=${therapistId}`} className="inline-flex items-center text-[var(--neutral-500)] hover:text-[var(--primary-600)] mb-6 transition-colors">
+                <Link href={therapist?.name ? `/therapists/${toSlug(therapist.name)}` : `/therapists`} className="inline-flex items-center text-[var(--neutral-500)] hover:text-[var(--primary-600)] mb-6 transition-colors">
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Profile
                 </Link>
@@ -521,7 +551,7 @@ function BookingContent() {
                                     </div>
 
                                     <button
-                                        onClick={handleConfirmBooking}
+                                        onClick={() => setShowConsentModal(true)}
                                         disabled={isSubmitting}
                                         className="w-full py-3 bg-[var(--secondary-500)] text-white rounded-xl hover:bg-[var(--secondary-600)] font-medium text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
@@ -589,6 +619,18 @@ function BookingContent() {
                 </div>
             </div>
 
+            {/* Consent Form Modal */}
+            <ConsentFormModal
+                isOpen={showConsentModal}
+                onClose={() => setShowConsentModal(false)}
+                onAgree={() => {
+                    setShowConsentModal(false);
+                    handleConfirmBooking();
+                }}
+                clientName={user.name || 'Client'}
+                clientId={user.id}
+                therapistName={therapist?.name || 'Therapist'}
+            />
         </div>
     );
 }
