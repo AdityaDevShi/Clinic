@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Therapist uploads: only the owning therapist can read/write/delete
+    match /therapist_uploads/{userId}/{allPaths=**} {
+      allow read, write, delete: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024; // 10 MB max
+      // Allow read without size check (size check only applies to writes)
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Blog post images: authenticated users can upload, anyone can read
+    match /blog_images/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024; // 10 MB max
+    }
+
+    // Default: deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
