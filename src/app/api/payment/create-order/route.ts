@@ -23,7 +23,16 @@ export async function POST(req: Request) {
         const therapistData = therapistDoc.data();
         // Check both 'price' and 'hourlyRate' fields, handle string values
         const rawPrice = therapistData?.price || therapistData?.hourlyRate;
-        const pricePerSession = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice;
+        const originalPrice = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice;
+
+        // Use discounted rate if discount is enabled and valid
+        const discountEnabled = therapistData?.discountEnabled === true;
+        const rawDiscountedRate = therapistData?.discountedRate;
+        const discountedRate = typeof rawDiscountedRate === 'string' ? parseFloat(rawDiscountedRate) : rawDiscountedRate;
+
+        const pricePerSession = (discountEnabled && discountedRate && !isNaN(discountedRate) && discountedRate > 0 && discountedRate < originalPrice)
+            ? discountedRate
+            : originalPrice;
 
         if (!pricePerSession || isNaN(pricePerSession) || pricePerSession <= 0) {
             console.error('Invalid price for therapist:', therapistId, 'data:', therapistData);
