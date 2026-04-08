@@ -23,6 +23,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Check if the authenticated user has the 'therapist' role
+    function isTherapist() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'therapist';
+    }
+
     // =========================================================================
     // COLLECTION RULES
     // =========================================================================
@@ -86,13 +92,121 @@ service cloud.firestore {
 
     // 5. Contact Submissions Collection
     match /contact_submissions/{docId} {
-      // Clients can write (no auth required for contact form)
-      // We rely on backend rate limiting, but just in case:
-      // We actually write these from the backend API, so we block client writes 
+      // Managed by backend API only
       allow read, write: if false; 
     }
 
-    // 6. Generic Fallback
+    // 6. Settings Collection (workshop banner, site config)
+    // Public read so WorkshopBanner can display on every page
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 7. Availability Collection (therapist schedule)
+    // Public read so booking pages can show available slots
+    match /availability/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 8. Busy Slots Collection (therapist blocked times)
+    // Public read so booking pages can exclude busy times
+    match /busy_slots/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 9. Feedback Collection (client reviews)
+    // Public read for therapist profile reviews
+    match /feedback/{docId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // 10. Consents Collection (TOS consent records)
+    // Only the admin SDK writes these, but allow authenticated create as fallback
+    match /consents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // 11. Patient Notes Collection (therapist session notes)
+    match /patient_notes/{noteId} {
+      // Therapist who created the note can read/write/delete
+      allow read, write, delete: if isAuthenticated() &&
+        request.auth.uid == resource.data.therapistId;
+      // Allow create if therapistId in the new doc matches the current user
+      allow create: if isAuthenticated() &&
+        request.resource.data.therapistId == request.auth.uid;
+      // Allow the patient (client) to read notes about them
+      allow read: if isAuthenticated() &&
+        request.auth.uid == resource.data.clientId;
+    }
+
+    // 12. Patient Attachments Collection (therapist uploaded files metadata)
+    match /patient_attachments/{attachmentId} {
+      allow read, write, delete: if isAuthenticated() &&
+        request.auth.uid == resource.data.therapistId;
+      allow create: if isAuthenticated() &&
+        request.resource.data.therapistId == request.auth.uid;
+      allow read: if isAuthenticated() &&
+        request.auth.uid == resource.data.clientId;
+    }
+
+    // 13. Session Links Collection (Google Meet links per therapist-patient pair)
+    match /session_links/{linkId} {
+      allow read, write: if isAuthenticated() &&
+        request.auth.uid == resource.data.therapistId;
+      allow create: if isAuthenticated() &&
+        request.resource.data.therapistId == request.auth.uid;
+      // Allow the patient to read their session link
+      allow read: if isAuthenticated() &&
+        request.auth.uid == resource.data.clientId;
+    }
+
+    // 14. Arambh Expenses Collection (admin-only business expense tracking)
+    match /arambh_expenses/{expenseId} {
+      allow read, write, create, delete: if isAdmin();
+    }
+
+    // 15. Blog Posts Collection
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (isAdmin() || isTherapist());
+      allow update: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.authorId);
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.authorId);
+
+      // Blog Comments Subcollection
+      match /blog_comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow delete: if isAdmin();
+      }
+
+      // Blog Likes Subcollection
+      match /blog_likes/{likeId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow delete: if isAuthenticated() && request.auth.uid == likeId;
+      }
+    }
+
+    // 16. Manual Patients Collection (pre-existing patients added by therapists)
+    match /manual_patients/{patientId} {
+      // Therapist who created the record can read/update/delete
+      allow read, write, delete: if isAuthenticated() &&
+        request.auth.uid == resource.data.therapistId;
+      // Allow create if therapistId in the new doc matches the current user
+      allow create: if isAuthenticated() &&
+        request.resource.data.therapistId == request.auth.uid;
+      // Admin can access all
+      allow read, write, delete: if isAdmin();
+    }
+
+    // 17. Generic Fallback
     // Deny all other access by default
     match /{document=**} {
       allow read, write: if false;
