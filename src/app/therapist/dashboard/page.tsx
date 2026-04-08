@@ -198,6 +198,14 @@ export default function TherapistDashboardPage() {
         let lastEarnings = 0;
         let lastAppointments = 0;
         let lastPatients = 0;
+        let revenueStartDate: Date | null = null;
+
+        // Fetch revenue start date setting
+        getDoc(doc(db, 'settings', 'revenue')).then(snap => {
+            if (snap.exists() && snap.data().startDate) {
+                revenueStartDate = snap.data().startDate.toDate();
+            }
+        }).catch(() => { });
 
         const updateStats = () => {
             setStats({
@@ -238,6 +246,8 @@ export default function TherapistDashboardPage() {
                 const amount = curr.amount || therapistHourlyRate;
                 // Count earnings for paid/confirmed/completed bookings
                 const isPaid = curr.paymentStatus === 'paid' || ['confirmed', 'completed'].includes(curr.status);
+                // Skip bookings before revenue start date
+                if (revenueStartDate && (curr.createdAt || curr.sessionTime) < revenueStartDate) return acc;
                 return isPaid ? acc + amount : acc;
             }, 0);
 
