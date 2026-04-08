@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, getDocs, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Therapist } from '@/types';
 import {
@@ -21,7 +21,9 @@ import {
     Power,
     Loader2,
     User,
-    X
+    X,
+    GripVertical,
+    Save
 } from 'lucide-react';
 
 const fadeInUp = {
@@ -70,6 +72,9 @@ export default function AdminTherapistsPage() {
         languages: '',
     });
     const [submitting, setSubmitting] = useState(false);
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [orderChanged, setOrderChanged] = useState(false);
+    const [savingOrder, setSavingOrder] = useState(false);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -110,7 +115,7 @@ export default function AdminTherapistsPage() {
                             t.email.trim() !== ''
                         ) as Therapist[];
 
-                    setTherapists(fetchedTherapists);
+                    setTherapists(fetchedTherapists.sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)));
                 }
             } catch (error) {
                 console.error('Error fetching therapists:', error);
@@ -196,6 +201,45 @@ export default function AdminTherapistsPage() {
         );
     });
 
+    // Drag and drop handlers
+    const handleDragStart = (index: number) => {
+        setDragIndex(index);
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (dragIndex === null || dragIndex === index) return;
+
+        const newList = [...therapists];
+        const [dragged] = newList.splice(dragIndex, 1);
+        newList.splice(index, 0, dragged);
+        setTherapists(newList);
+        setDragIndex(index);
+        setOrderChanged(true);
+    };
+
+    const handleDragEnd = () => {
+        setDragIndex(null);
+    };
+
+    const handleSaveOrder = async () => {
+        setSavingOrder(true);
+        try {
+            const batch = writeBatch(db);
+            therapists.forEach((t, index) => {
+                batch.update(doc(db, 'therapists', t.id), { displayOrder: index });
+            });
+            await batch.commit();
+            setOrderChanged(false);
+            alert('Display order saved!');
+        } catch (error) {
+            console.error('Error saving order:', error);
+            alert('Failed to save order.');
+        } finally {
+            setSavingOrder(false);
+        }
+    };
+
     if (authLoading || loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[var(--warm-50)]">
@@ -239,6 +283,16 @@ export default function AdminTherapistsPage() {
                                         className="input pl-10 py-2 text-sm w-full sm:w-48"
                                     />
                                 </div>
+                                {orderChanged && (
+                                    <button
+                                        onClick={handleSaveOrder}
+                                        disabled={savingOrder}
+                                        className="btn btn-primary py-2 px-4 text-sm flex items-center bg-green-600 hover:bg-green-700"
+                                    >
+                                        {savingOrder ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                        Save Order
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setShowAddModal(true)}
                                     className="btn btn-primary py-2 px-4 text-sm flex items-center"
@@ -255,6 +309,7 @@ export default function AdminTherapistsPage() {
                                 <table className="w-full">
                                     <thead className="bg-[var(--warm-50)] border-b border-[var(--border)]">
                                         <tr>
+                                            <th className="text-left py-4 px-3 text-sm font-medium text-[var(--neutral-600)] w-10"></th>
                                             <th className="text-left py-4 px-6 text-sm font-medium text-[var(--neutral-600)]">Therapist</th>
                                             <th className="text-left py-4 px-6 text-sm font-medium text-[var(--neutral-600)]">Specialization</th>
                                             <th className="text-left py-4 px-6 text-sm font-medium text-[var(--neutral-600)]">Rate</th>
@@ -264,7 +319,19 @@ export default function AdminTherapistsPage() {
                                     </thead>
                                     <tbody>
                                         {filteredTherapists.map((therapist, index) => (
-                                            <tr key={therapist.id} className={index !== filteredTherapists.length - 1 ? 'border-b border-[var(--border)]' : ''}>
+                                            <tr
+                                                key={therapist.id}
+                                                draggable={!searchTerm}
+                                                onDragStart={() => handleDragStart(index)}
+                                                onDragOver={(e) => handleDragOver(e, index)}
+                                                onDragEnd={handleDragEnd}
+                                                className={`${index !== filteredTherapists.length - 1 ? 'border-b border-[var(--border)]' : ''} ${dragIndex === index ? 'bg-[var(--primary-50)] opacity-70' : ''} transition-colors`}
+                                            >
+                                                <td className="py-4 px-3">
+                                                    <div className="cursor-grab active:cursor-grabbing text-[var(--neutral-400)] hover:text-[var(--neutral-600)]">
+                                                        <GripVertical className="w-5 h-5" />
+                                                    </div>
+                                                </td>
                                                 <td className="py-4 px-6">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 bg-[var(--primary-100)] rounded-full flex items-center justify-center">
@@ -332,133 +399,135 @@ export default function AdminTherapistsPage() {
                         </motion.div>
                     </motion.div>
                 </div>
-            </main>
+            </main >
 
             {/* Add Therapist Modal */}
-            {showAddModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
-                    >
-                        <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-                            <h2 className="font-serif text-xl text-[var(--primary-700)]">Add Therapist</h2>
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                className="p-2 hover:bg-[var(--warm-50)] rounded-lg"
-                            >
-                                <X className="w-5 h-5 text-[var(--neutral-500)]" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleAddTherapist} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Name</label>
-                                <input
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Specialization</label>
-                                <input
-                                    type="text"
-                                    value={formData.specialization}
-                                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Hourly Rate (₹)</label>
-                                <input
-                                    type="number"
-                                    value={formData.hourlyRate}
-                                    onChange={(e) => setFormData({ ...formData, hourlyRate: Number(e.target.value) })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Bio</label>
-                                <textarea
-                                    value={formData.bio}
-                                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                    className="input min-h-[80px] resize-none"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
-                                    Qualifications (comma-separated)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.qualifications}
-                                    onChange={(e) => setFormData({ ...formData, qualifications: e.target.value })}
-                                    className="input"
-                                    placeholder="M.Phil Psychology"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
-                                    Languages (comma-separated)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.languages}
-                                    onChange={(e) => setFormData({ ...formData, languages: e.target.value })}
-                                    className="input"
-                                    placeholder="English, Hindi"
-                                />
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
+            {
+                showAddModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
+                        >
+                            <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+                                <h2 className="font-serif text-xl text-[var(--primary-700)]">Add Therapist</h2>
                                 <button
-                                    type="button"
                                     onClick={() => setShowAddModal(false)}
-                                    className="flex-1 btn btn-secondary py-3"
+                                    className="p-2 hover:bg-[var(--warm-50)] rounded-lg"
                                 >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex-1 btn btn-primary py-3 disabled:opacity-50"
-                                >
-                                    {submitting ? (
-                                        <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                                    ) : (
-                                        'Add Therapist'
-                                    )}
+                                    <X className="w-5 h-5 text-[var(--neutral-500)]" />
                                 </button>
                             </div>
-                        </form>
-                    </motion.div>
-                </div>
-            )}
+
+                            <form onSubmit={handleAddTherapist} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Name</label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="input"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Email</label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        className="input"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Specialization</label>
+                                    <input
+                                        type="text"
+                                        value={formData.specialization}
+                                        onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                                        className="input"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Hourly Rate (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={formData.hourlyRate}
+                                        onChange={(e) => setFormData({ ...formData, hourlyRate: Number(e.target.value) })}
+                                        className="input"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">Bio</label>
+                                    <textarea
+                                        value={formData.bio}
+                                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                                        className="input min-h-[80px] resize-none"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                        Qualifications (comma-separated)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.qualifications}
+                                        onChange={(e) => setFormData({ ...formData, qualifications: e.target.value })}
+                                        className="input"
+                                        placeholder="M.Phil Psychology"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--neutral-700)] mb-2">
+                                        Languages (comma-separated)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.languages}
+                                        onChange={(e) => setFormData({ ...formData, languages: e.target.value })}
+                                        className="input"
+                                        placeholder="English, Hindi"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddModal(false)}
+                                        className="flex-1 btn btn-secondary py-3"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={submitting}
+                                        className="flex-1 btn btn-primary py-3 disabled:opacity-50"
+                                    >
+                                        {submitting ? (
+                                            <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                                        ) : (
+                                            'Add Therapist'
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )
+            }
 
 
-        </div>
+        </div >
     );
 }
