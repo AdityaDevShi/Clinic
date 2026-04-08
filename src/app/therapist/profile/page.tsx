@@ -47,6 +47,8 @@ export default function EditProfilePage() {
         testimonials: [] as { id: string; author: string; content: string; rating: number }[],
         certificates: [] as { id: string; title: string; url: string }[],
         photoUrl: '',
+        discountEnabled: false,
+        discountedRate: 0,
         sessionDuration: '50-60 Minutes',
         workingHoursStart: '10:30',
         workingHoursEnd: '19:00',
@@ -323,6 +325,57 @@ export default function EditProfilePage() {
                                     />
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Discount Pricing */}
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-[var(--border)]">
+                        <h2 className="text-xl font-serif text-[var(--primary-700)] mb-4">Discount Pricing</h2>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium text-[var(--neutral-700)]">Enable Discount</p>
+                                    <p className="text-sm text-[var(--neutral-500)]">Show a discounted price to attract clients</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, discountEnabled: !formData.discountEnabled })}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.discountEnabled ? 'bg-green-500' : 'bg-[var(--neutral-300)]'
+                                        }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.discountEnabled ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {formData.discountEnabled && (
+                                <div className="bg-[var(--warm-50)] rounded-lg p-4 space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--neutral-700)] mb-1">Discounted Rate (₹)</label>
+                                        <input
+                                            type="number"
+                                            value={formData.discountedRate}
+                                            onChange={e => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                setFormData({ ...formData, discountedRate: val });
+                                            }}
+                                            className="input w-full"
+                                            placeholder="e.g. 1500"
+                                        />
+                                        {formData.discountedRate > 0 && formData.hourlyRate > 0 && (
+                                            formData.discountedRate >= formData.hourlyRate ? (
+                                                <p className="text-sm text-red-500 mt-1">⚠ Discounted price must be lower than ₹{formData.hourlyRate}</p>
+                                            ) : (
+                                                <p className="text-sm text-green-600 mt-1 font-medium">
+                                                    ✓ {Math.round(((formData.hourlyRate - formData.discountedRate) / formData.hourlyRate) * 100)}% discount — clients will see ₹{formData.discountedRate}/session
+                                                </p>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
