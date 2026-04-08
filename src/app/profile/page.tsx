@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Therapist, Feedback } from '@/types';
+import { toSlug } from '@/lib/slugify';
 
 import {
     ArrowLeft,
@@ -112,6 +113,30 @@ function ProfileContent() {
             return;
         }
 
+        // Redirect old /profile?id= URLs to new /therapists/slug URLs
+        async function redirectToSlug() {
+            try {
+                const docSnapshot = await getDoc(doc(db, 'therapists', therapistId!));
+                if (docSnapshot.exists()) {
+                    const name = docSnapshot.data().name;
+                    if (name) {
+                        router.replace(`/therapists/${toSlug(name)}`);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error redirecting to slug URL:', error);
+            }
+            // If redirect fails, still load the page normally
+            loadProfile();
+        }
+
+        redirectToSlug();
+    }, [therapistId]);
+
+    // Fallback: load profile normally if redirect doesn't work
+    function loadProfile() {
+
         let unsubscribeTherapist: () => void;
 
         // Fetch auxiliary data (reviews)
@@ -136,7 +161,7 @@ function ProfileContent() {
         }
 
         // Live Listener for Therapist
-        unsubscribeTherapist = onSnapshot(doc(db, 'therapists', therapistId), (docSnapshot) => {
+        unsubscribeTherapist = onSnapshot(doc(db, 'therapists', therapistId!), (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const data = docSnapshot.data();
                 setTherapist({
@@ -153,12 +178,12 @@ function ProfileContent() {
             setLoading(false);
         });
 
-        fetchAuxData();
+        loadProfile();
 
         return () => {
             if (unsubscribeTherapist) unsubscribeTherapist();
         };
-    }, [therapistId]);
+    }
 
     // Handle Escape key for Lightbox
     useEffect(() => {
