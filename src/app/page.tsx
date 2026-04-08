@@ -11,11 +11,11 @@ import {
   Shield,
   Leaf,
   Award,
-  Phone,
   Mail,
   MapPin,
   ArrowRight
 } from 'lucide-react';
+import PhoneDisplay from '@/components/ui/PhoneDisplay';
 
 // Animation variants
 const fadeInUp = {
@@ -463,14 +463,9 @@ export default function HomePage() {
               variants={staggerContainer}
               className="flex flex-wrap justify-center gap-8 md:gap-12"
             >
-              <motion.a
-                variants={fadeInUp}
-                href="tel:+917075829856"
-                className="flex items-center space-x-2 text-[var(--neutral-600)] hover:text-[var(--primary-600)] transition-colors"
-              >
-                <Phone className="w-5 h-5 text-[var(--primary-500)]" />
-                <span>+91 7075829856</span>
-              </motion.a>
+              <motion.div variants={fadeInUp}>
+                <PhoneDisplay variant="inline" />
+              </motion.div>
 
               <motion.a
                 variants={fadeInUp}
