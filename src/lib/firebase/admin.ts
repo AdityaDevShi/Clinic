@@ -12,7 +12,12 @@ const globalForAdmin = globalThis as typeof globalThis & { _firebaseAdminInitial
 
 if (!globalForAdmin._firebaseAdminInitialized) {
     try {
-        admin.initializeApp();
+        const credential = admin.credential.cert({
+            projectId: process.env.ADMIN_PROJECT_ID,
+            clientEmail: process.env.ADMIN_CLIENT_EMAIL,
+            privateKey: process.env.ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        });
+        admin.initializeApp({ credential });
         globalForAdmin._firebaseAdminInitialized = true;
         console.log('Firebase Admin SDK initialized with Application Default Credentials.');
     } catch (error: unknown) {
@@ -31,4 +36,8 @@ export const getAdminDb = () => {
 
 export const getAdminAuth = () => {
     return admin.auth();
+};
+
+export const getAdminStorage = () => {
+    return admin.storage();
 };
