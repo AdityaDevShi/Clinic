@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import WorkshopBanner from "@/components/layout/WorkshopBanner";
@@ -73,6 +74,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
+      {/* Google Ads (gtag.js) */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=AW-17986636182"
+        strategy="afterInteractive"
+      />
+      <Script id="google-ads-gtag" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          window.gtag = gtag;
+          gtag('js', new Date());
+          gtag('config', 'AW-17986636182');
+        `}
+      </Script>
       <body
         className={`${playfair.variable} ${inter.variable} antialiased bg-[var(--background)] text-[var(--foreground)]`}
         style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
