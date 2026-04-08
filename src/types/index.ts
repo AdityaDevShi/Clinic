@@ -37,6 +37,11 @@ export interface Therapist {
     mediaMentions?: { id: string; title: string; url: string; publisher: string; date: string; }[];
     therapyModes?: string[];
     availabilitySummary?: string;
+    // Discount Pricing
+    discountEnabled?: boolean;
+    discountedRate?: number;
+    // Admin Display Order
+    displayOrder?: number;
     // Dynamic Scheduling Fields
     sessionDuration?: string;   // e.g. "50-60 Minutes"
     workingHoursStart?: string; // "10:00"
