@@ -9,6 +9,7 @@ import { Search, Filter, MapPin, Star, ArrowRight, Video, Calendar } from 'lucid
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Therapist } from '@/types';
+import { toSlug } from '@/lib/slugify';
 
 
 const fadeInUp = {
@@ -77,7 +78,12 @@ export default function TherapistsPage() {
                     ) as Therapist[];
 
                 // Sort client-side safely
-                fetchedTherapists.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                fetchedTherapists.sort((a, b) => {
+                    const orderA = a.displayOrder ?? 999;
+                    const orderB = b.displayOrder ?? 999;
+                    if (orderA !== orderB) return orderA - orderB;
+                    return (a.name || '').localeCompare(b.name || '');
+                });
 
                 setAllTherapists(fetchedTherapists);
                 setLoading(false);
@@ -261,10 +267,20 @@ export default function TherapistsPage() {
                                     <div className="w-full pt-4 border-t border-[var(--border)] mt-auto">
                                         <div className="flex items-center justify-between mb-4 text-sm">
                                             <span className="text-[var(--neutral-500)] font-medium">
-                                                From <span className="text-[var(--neutral-900)]">₹{therapist.hourlyRate}</span>/session
+                                                {therapist.discountEnabled && therapist.discountedRate && therapist.discountedRate < therapist.hourlyRate ? (
+                                                    <span className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[var(--neutral-400)] line-through">₹{therapist.hourlyRate}</span>
+                                                        <span className="text-[var(--neutral-900)] font-semibold">₹{therapist.discountedRate}</span>
+                                                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold">
+                                                            {Math.round(((therapist.hourlyRate - therapist.discountedRate) / therapist.hourlyRate) * 100)}% off
+                                                        </span>
+                                                    </span>
+                                                ) : (
+                                                    <>From <span className="text-[var(--neutral-900)]">₹{therapist.hourlyRate}</span>/session</>
+                                                )}
                                             </span>
                                             <Link
-                                                href={`/profile?id=${therapist.id}`}
+                                                href={`/therapists/${toSlug(therapist.name)}`}
                                                 className="text-[var(--primary-700)] hover:text-[var(--primary-800)] font-medium inline-flex items-center gap-1 hover:underline"
                                             >
                                                 View Profile <ArrowRight className="w-3 h-3" />
