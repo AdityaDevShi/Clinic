@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatTimeSlot } from '@/lib/scheduling/availability';
+import { toSlug } from '@/lib/slugify';
 import { format } from 'date-fns';
 import {
     ArrowLeft,
@@ -199,7 +200,7 @@ export default function BookingConfirmPage() {
                 <div className="max-w-2xl mx-auto">
                     {/* Breadcrumb */}
                     <Link
-                        href={`/therapists/${booking.therapistId}`}
+                        href={`/therapists/${toSlug(booking.therapistName)}`}
                         className="inline-flex items-center text-sm text-[var(--neutral-500)] hover:text-[var(--primary-600)] transition-colors mb-6"
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
