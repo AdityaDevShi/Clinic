@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Phone, Mail, MapPin, Heart } from 'lucide-react';
+import { Mail, MapPin, Heart } from 'lucide-react';
+import PhoneDisplay from '@/components/ui/PhoneDisplay';
 
 const footerLinks = {
     services: [
@@ -48,10 +49,7 @@ export default function Footer() {
                             Providing compassionate and confidential psychological support to help individuals find clarity and emotional balance.
                         </p>
                         <div className="space-y-3">
-                            <a href="tel:+917075829856" className="flex items-center space-x-2 text-[var(--primary-200)] hover:text-white transition-colors text-sm">
-                                <Phone className="w-4 h-4" />
-                                <span>+91 7075829856</span>
-                            </a>
+                            <PhoneDisplay variant="footer" iconClassName="w-4 h-4" />
                             <a href="mailto:care@arambh.net" className="flex items-center space-x-2 text-[var(--primary-200)] hover:text-white transition-colors text-sm">
                                 <Mail className="w-4 h-4" />
                                 <span>care@arambh.net</span>
