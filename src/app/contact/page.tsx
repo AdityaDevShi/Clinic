@@ -5,8 +5,9 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 
-import { Phone, Mail, MapPin, Clock, Send, Loader2, Lock } from 'lucide-react';
+import { Mail, MapPin, Clock, Send, Loader2, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import PhoneDisplay from '@/components/ui/PhoneDisplay';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -137,19 +138,9 @@ export default function ContactPage() {
                             </motion.p>
 
                             <motion.div variants={staggerContainer} className="space-y-6">
-                                <motion.a
-                                    variants={fadeInUp}
-                                    href="tel:+917075829856"
-                                    className="flex items-start space-x-4 group"
-                                >
-                                    <div className="w-12 h-12 bg-[var(--primary-5)] rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary-100)] transition-colors">
-                                        <Phone className="w-5 h-5 text-[var(--primary-600)]" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-medium text-[var(--neutral-700)] mb-1">Phone</h3>
-                                        <p className="text-[var(--neutral-600)]">+91 7075829856</p>
-                                    </div>
-                                </motion.a>
+                                <motion.div variants={fadeInUp}>
+                                    <PhoneDisplay variant="card" />
+                                </motion.div>
 
                                 <motion.a
                                     variants={fadeInUp}
@@ -311,7 +302,7 @@ export default function ContactPage() {
                                                     value={formData.phone}
                                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                                     className="input bg-white"
-                                                    placeholder="+91 7075829856"
+                                                    placeholder="Your phone number"
                                                 />
                                             </div>
                                             <div>
