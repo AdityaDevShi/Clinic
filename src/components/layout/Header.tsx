@@ -16,6 +16,7 @@ const navLinks = [
     { href: '/about', label: 'About' },
     { href: '/therapists', label: 'Our Therapists' },
     { href: '/services', label: 'Services' },
+    { href: '/blog', label: 'Blog' },
     { href: '/contact', label: 'Contact' },
 ];
 
