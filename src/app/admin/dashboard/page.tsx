@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, getDocs, orderBy, limit, where } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, where, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Booking, Therapist, Feedback } from '@/types';
 import { format, subDays, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
@@ -26,7 +26,9 @@ import {
     Settings,
     FileText,
     MessageCircle,
-    Megaphone
+    Megaphone,
+    Wallet,
+    AlertTriangle
 } from 'lucide-react';
 
 const fadeInUp = {
@@ -65,6 +67,7 @@ export default function AdminDashboardPage() {
     const [recentBookings, setRecentBookings] = useState<Booking[]>(initialRecentBookings);
     const [recentFeedback, setRecentFeedback] = useState<Feedback[]>(initialRecentFeedback);
     const [loading, setLoading] = useState(true);
+    const [expenseAlert, setExpenseAlert] = useState<'red' | 'yellow' | null>(null);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -81,6 +84,15 @@ export default function AdminDashboardPage() {
             if (!user) return;
 
             try {
+                // 0. Fetch revenue start date setting
+                let revenueStartDate: Date | null = null;
+                try {
+                    const revenueDoc = await getDoc(doc(db, 'settings', 'revenue'));
+                    if (revenueDoc.exists() && revenueDoc.data().startDate) {
+                        revenueStartDate = revenueDoc.data().startDate.toDate();
+                    }
+                } catch (e) { console.log('No revenue start date set'); }
+
                 // 1. Fetch Recent Bookings for the list
                 const recentBookingsQuery = query(
                     collection(db, 'bookings'),
@@ -124,9 +136,14 @@ export default function AdminDashboardPage() {
                     isWithinInterval(b.createdAt, { start: startOfDay(weekAgo), end: endOfDay(now) })
                 ).length;
 
-                // Total revenue for the month
+                // Total revenue for the month (filtered by revenueStartDate if set)
                 const totalRevenue = monthBookings
-                    .filter((b) => b.paymentStatus === 'paid' || b.status === 'confirmed' || b.status === 'completed')
+                    .filter((b) => {
+                        const isPaid = b.paymentStatus === 'paid' || b.status === 'confirmed' || b.status === 'completed';
+                        if (!isPaid) return false;
+                        if (revenueStartDate && b.createdAt < revenueStartDate) return false;
+                        return true;
+                    })
                     .reduce((acc, b) => acc + (b.amount || 0), 0);
 
                 // 3. precise Total Clients Count
@@ -181,6 +198,24 @@ export default function AdminDashboardPage() {
                 );
                 const therapistsDocs = await getDocs(therapistsQuery);
                 setStats((prev) => ({ ...prev, totalTherapists: therapistsDocs.size || 0 }));
+
+                // Fetch expense alerts for dashboard badge
+                try {
+                    const expensesQuery = query(collection(db, 'arambh_expenses'));
+                    const expensesDocs = await getDocs(expensesQuery);
+                    let worstAlert: 'red' | 'yellow' | null = null;
+                    const nowMs = now.getTime();
+                    expensesDocs.docs.forEach(d => {
+                        const data = d.data();
+                        if (data.isPaid) return;
+                        const dueDate = data.nextDueDate?.toDate();
+                        if (!dueDate) return;
+                        const daysUntilDue = Math.ceil((dueDate.getTime() - nowMs) / (1000 * 60 * 60 * 24));
+                        if (daysUntilDue <= 3) worstAlert = 'red';
+                        else if (daysUntilDue <= 15 && worstAlert !== 'red') worstAlert = 'yellow';
+                    });
+                    setExpenseAlert(worstAlert);
+                } catch (e) { console.log('No expenses yet'); }
 
             } catch (error) {
                 console.log('Using demo data:', error);
@@ -289,7 +324,7 @@ export default function AdminDashboardPage() {
                         </motion.div>
 
                         {/* Quick Actions */}
-                        <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                             <Link href="/admin/therapists" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3">
                                 <UserCheck className="w-5 h-5 text-[var(--primary-600)]" />
                                 <span className="text-[var(--neutral-700)] font-medium">Therapists</span>
@@ -305,6 +340,17 @@ export default function AdminDashboardPage() {
                             <Link href="/admin/workshops" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3">
                                 <Megaphone className="w-5 h-5 text-[var(--primary-600)]" />
                                 <span className="text-[var(--neutral-700)] font-medium">Workshops</span>
+                            </Link>
+                            <Link href="/admin/expenses" className={`bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3 relative ${expenseAlert === 'red' ? 'ring-2 ring-red-300' : expenseAlert === 'yellow' ? 'ring-2 ring-yellow-300' : ''
+                                }`}>
+                                <Wallet className="w-5 h-5 text-[var(--primary-600)]" />
+                                <span className="text-[var(--neutral-700)] font-medium">Arambh Expenses</span>
+                                {expenseAlert && (
+                                    <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold ${expenseAlert === 'red' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'
+                                        }`}>
+                                        !
+                                    </span>
+                                )}
                             </Link>
                         </motion.div>
 
