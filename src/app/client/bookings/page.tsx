@@ -44,7 +44,7 @@ const staggerContainer = {
 
 export default function ClientBookingsPage() {
     const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
+    const { user, firebaseUser, loading: authLoading } = useAuth();
 
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -209,10 +209,14 @@ export default function ClientBookingsPage() {
         if (!confirm("Are you sure you want to cancel this session? If eligible, your refund will be automatically processed.")) return;
 
         try {
+            const token = await firebaseUser?.getIdToken();
             const res = await fetch('/api/payment/cancel-booking', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bookingId, requestingUid: user?.id })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ bookingId })
             });
 
             const data = await res.json();
@@ -233,10 +237,24 @@ export default function ClientBookingsPage() {
             const newSessionTime = new Date(selectedDate);
             newSessionTime.setHours(hours, minutes, 0, 0);
 
-            await BookingService.rescheduleBooking(rescheduleBooking.id, newSessionTime, rescheduleBooking.therapistId);
+            const token = await firebaseUser?.getIdToken();
+            const res = await fetch('/api/payment/reschedule-booking', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    bookingId: rescheduleBooking.id,
+                    newSessionTime: newSessionTime.toISOString()
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to reschedule booking');
 
             setRescheduleBooking(null); // Close modal
-            alert("Session Rescheduled Successfully!");
+            alert(data.message || "Session Rescheduled Successfully!");
         } catch (error: any) {
             alert("Reschedule Failed: " + error.message);
         } finally {

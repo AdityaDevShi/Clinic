@@ -1,20 +1,40 @@
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, verifyRequestUid } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { therapistId, sessionsCount, uId, bookingIds } = body;
+        // Authenticate: derive the caller's uid from the verified ID token,
+        // never from the request body (which is attacker-controlled).
+        const requestingUid = await verifyRequestUid(req);
+        if (!requestingUid) {
+            return NextResponse.json({ error: 'Unauthorized: invalid or missing auth token' }, { status: 401 });
+        }
 
-        if (!therapistId || !sessionsCount || !uId || !bookingIds) {
+        const body = await req.json();
+        const { therapistId, bookingIds } = body;
+
+        if (!therapistId || !Array.isArray(bookingIds) || bookingIds.length === 0) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // 1. Securely fetch the therapist's price from the database
         const adminDb = getAdminDb();
+
+        // Validate every referenced booking exists and belongs to the caller.
+        // This stops a user from creating an order tied to arbitrary or other
+        // users' bookings. The session count is derived from these
+        // server-verified bookings — never trusted from the client.
+        for (const id of bookingIds) {
+            const bookingSnap = await adminDb.collection('bookings').doc(String(id)).get();
+            if (!bookingSnap.exists || bookingSnap.data()?.clientId !== requestingUid) {
+                return NextResponse.json({ error: 'Invalid booking reference' }, { status: 403 });
+            }
+        }
+        const sessionsCount = bookingIds.length;
+
+        // 1. Securely fetch the therapist's price from the database
         const therapistDoc = await adminDb.collection('therapists').doc(therapistId).get();
         if (!therapistDoc.exists) {
             return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
@@ -53,10 +73,10 @@ export async function POST(req: Request) {
         const options = {
             amount: amountInPaise,
             currency: "INR",
-            receipt: `rcpt_${uId}_${Date.now()}`.substring(0, 40),
+            receipt: `rcpt_${requestingUid}_${Date.now()}`.substring(0, 40),
             notes: {
                 therapistId,
-                uId,
+                uId: requestingUid,
                 sessionsCount: sessionsCount.toString(),
                 bookingIds: bookingIds.join(',')
             }

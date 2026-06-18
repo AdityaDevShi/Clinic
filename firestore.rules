@@ -104,17 +104,30 @@ service cloud.firestore {
     }
 
     // 7. Availability Collection (therapist schedule)
-    // Public read so booking pages can show available slots
+    // Public read so booking pages can show available slots.
+    // Writes restricted to the owning therapist (or admin) — a logged-in
+    // client must not be able to alter another therapist's schedule.
     match /availability/{docId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        (request.resource.data.therapistId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() &&
+        (resource.data.therapistId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() &&
+        (resource.data.therapistId == request.auth.uid || isAdmin());
     }
 
     // 8. Busy Slots Collection (therapist blocked times)
-    // Public read so booking pages can exclude busy times
+    // Public read so booking pages can exclude busy times.
+    // Writes restricted to the owning therapist (or admin).
     match /busy_slots/{docId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        (request.resource.data.therapistId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() &&
+        (resource.data.therapistId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() &&
+        (resource.data.therapistId == request.auth.uid || isAdmin());
     }
 
     // 9. Feedback Collection (client reviews)
@@ -126,9 +139,11 @@ service cloud.firestore {
     }
 
     // 10. Consents Collection (TOS consent records)
-    // Only the admin SDK writes these, but allow authenticated create as fallback
+    // Created by the admin SDK (server). Consent PDFs contain sensitive
+    // personal data, so a client may read only their own; admins read all.
     match /consents/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() &&
+        (resource.data.clientId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }

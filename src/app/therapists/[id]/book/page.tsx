@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function BookingPage() {
     const params = useParams();
     const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
+    const { user, firebaseUser, loading: authLoading } = useAuth();
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const { Razorpay: RazorpayInstance } = useRazorpay();
 
@@ -214,9 +214,13 @@ export default function BookingPage() {
             const bookingIds = await Promise.all(bookingPromises);
 
             // 2. Fetch Razorpay Order from Secure Backend (No GST)
+            const token = await firebaseUser?.getIdToken();
             const orderRes = await fetch('/api/payment/create-order', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     therapistId: therapist.id,
                     sessionsCount: selectedSlots.length,

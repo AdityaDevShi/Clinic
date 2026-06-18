@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, verifyRequestUid } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { bookingId, requestingUid } = body;
+        const { bookingId } = body;
 
-        if (!bookingId || !requestingUid) {
+        if (!bookingId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        // Authenticate: derive the caller's uid from the verified ID token,
+        // never from the request body (which is attacker-controlled).
+        const requestingUid = await verifyRequestUid(req);
+        if (!requestingUid) {
+            return NextResponse.json({ error: 'Unauthorized: invalid or missing auth token' }, { status: 401 });
         }
 
         // Fetch user to verify role securely
@@ -32,8 +39,19 @@ export async function POST(req: Request) {
         const bookingData = bookingDoc.data();
 
         // 3. Security Check: Is user authorized to cancel this booking?
+        // Clients may only cancel their own bookings; therapists only bookings
+        // assigned to them. Admins may cancel any booking.
         if (role === 'client' && bookingData?.clientId !== requestingUid) {
             return NextResponse.json({ error: 'Unauthorized to cancel this booking' }, { status: 403 });
+        }
+        if (role === 'therapist' && bookingData?.therapistId !== requestingUid) {
+            return NextResponse.json({ error: 'Unauthorized to cancel this booking' }, { status: 403 });
+        }
+
+        // 3b. Idempotency guard: don't re-process an already-cancelled booking
+        // (prevents duplicate refund attempts).
+        if (bookingData?.status === 'cancelled') {
+            return NextResponse.json({ error: 'Booking is already cancelled' }, { status: 400 });
         }
 
         // 4. Time Check (24-Hour Rule for Clients — affects refund eligibility only)

@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Firebase Auth account exports — contain password hashes + salts, never commit
+accounts.json
+accounts_clean.json
+
 # vercel
 .vercel
 

@@ -1,0 +1,5 @@
+$env:GIT_COMMITTER_EMAIL="aditya18dev@gmail.com"
+$env:GIT_AUTHOR_EMAIL="aditya18dev@gmail.com"
+$env:GIT_AUTHOR_NAME="AdityaDevShi"
+$env:GIT_COMMITTER_NAME="AdityaDevShi"
+git rebase --root -x "git commit --amend --reset-author --no-edit"

@@ -1,22 +1,36 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { getAdminDb, verifyRequestUid } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 
+// Firestore caps a single document at ~1 MiB. Reject oversized PDFs early so
+// we fail with a clear error instead of an opaque write failure.
+const MAX_PDF_BASE64_LENGTH = 900_000; // ~675 KB of binary
+
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { clientId, clientName, therapistName, pdfBase64, agreedAt } = body;
+        // Authenticate: derive the caller's uid from the verified ID token.
+        const requestingUid = await verifyRequestUid(req);
+        if (!requestingUid) {
+            return NextResponse.json({ error: 'Unauthorized: invalid or missing auth token' }, { status: 401 });
+        }
 
-        if (!clientId || !clientName || !pdfBase64 || !agreedAt) {
+        const body = await req.json();
+        const { clientName, therapistName, pdfBase64, agreedAt } = body;
+
+        if (!clientName || !pdfBase64 || !agreedAt) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // Store consent record in Firestore
-        // The PDF base64 is stored so it can be retrieved/downloaded later
+        if (typeof pdfBase64 !== 'string' || pdfBase64.length > MAX_PDF_BASE64_LENGTH) {
+            return NextResponse.json({ error: 'Consent document is invalid or too large' }, { status: 400 });
+        }
+
+        // Bind the consent record to the authenticated user — never trust a
+        // clientId supplied in the request body.
         const adminDb = getAdminDb();
         const consentRef = await adminDb.collection('consents').add({
-            clientId,
+            clientId: requestingUid,
             clientName,
             therapistName: therapistName || '',
             signedBy: clientName,

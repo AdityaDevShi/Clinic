@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { getAdminDb } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -20,14 +21,13 @@ export async function POST(req: Request) {
         const {
             razorpay_payment_id,
             razorpay_order_id,
-            razorpay_signature,
-            bookingIds
+            razorpay_signature
         } = body;
 
         // Validate required fields
-        if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !bookingIds?.length) {
+        if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
             return NextResponse.json(
-                { error: 'Missing required fields: razorpay_payment_id, razorpay_order_id, razorpay_signature, bookingIds' },
+                { error: 'Missing required fields: razorpay_payment_id, razorpay_order_id, razorpay_signature' },
                 { status: 400 }
             );
         }
@@ -49,7 +49,28 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 });
         }
 
-        // 2. Signature verified — update all bookings in a batch
+        // 2. Resolve which bookings this payment covers from the ORDER's notes
+        // (set server-side in /create-order), NOT from the client request.
+        // This prevents a client from paying for one order and confirming
+        // unrelated/unpaid bookings.
+        const instance = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID as string,
+            key_secret: keySecret,
+        });
+
+        const order = await instance.orders.fetch(razorpay_order_id);
+        const orderNotes = (order?.notes || {}) as Record<string, string>;
+        const bookingIds = (orderNotes.bookingIds || '')
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean);
+
+        if (bookingIds.length === 0) {
+            console.error('Payment verification: no bookingIds found in order notes.', razorpay_order_id);
+            return NextResponse.json({ error: 'No bookings associated with this order' }, { status: 400 });
+        }
+
+        // 3. Signature verified — update all bookings in a batch
         const adminDb = getAdminDb();
         const batch = adminDb.batch();
         const now = new Date();

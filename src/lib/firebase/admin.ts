@@ -38,6 +38,32 @@ export const getAdminAuth = () => {
     return admin.auth();
 };
 
+/**
+ * Verify the Firebase ID token on an incoming API request.
+ * Reads the `Authorization: Bearer <idToken>` header, verifies it with the
+ * Admin SDK, and returns the authenticated uid — or null if missing/invalid.
+ *
+ * Never trust a uid sent in the request body: it is attacker-controlled.
+ * Always derive the caller's identity from the verified token instead.
+ */
+export const verifyRequestUid = async (req: Request): Promise<string | null> => {
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+    }
+    const idToken = authHeader.slice('Bearer '.length).trim();
+    if (!idToken) {
+        return null;
+    }
+    try {
+        const decoded = await getAdminAuth().verifyIdToken(idToken);
+        return decoded.uid;
+    } catch (error) {
+        console.error('ID token verification failed:', error);
+        return null;
+    }
+};
+
 export const getAdminStorage = () => {
     return admin.storage();
 };

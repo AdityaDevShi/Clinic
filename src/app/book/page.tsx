@@ -21,7 +21,7 @@ import { useRazorpay } from 'react-razorpay';
 function BookingContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
+    const { user, firebaseUser, loading: authLoading } = useAuth();
     const { Razorpay: RazorpayInstance } = useRazorpay();
 
     // Get therapistId from query param
@@ -213,9 +213,13 @@ function BookingContent() {
             const bookingIds = await Promise.all(bookingPromises);
 
             // 2. Fetch Razorpay Order from Secure Backend
+            const token = await firebaseUser?.getIdToken();
             const orderRes = await fetch('/api/payment/create-order', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     therapistId: therapist.id,
                     sessionsCount: selectedSlots.length,

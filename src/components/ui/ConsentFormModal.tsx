@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, Check, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ConsentFormModalProps {
     isOpen: boolean;
@@ -58,6 +59,7 @@ We understand that therapies can be challenging especially for those who are not
 ];
 
 export default function ConsentFormModal({ isOpen, onClose, onAgree, clientName, clientId, therapistName }: ConsentFormModalProps) {
+    const { firebaseUser } = useAuth();
     const [agreed, setAgreed] = useState(false);
     const [saving, setSaving] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -134,9 +136,13 @@ export default function ConsentFormModal({ isOpen, onClose, onAgree, clientName,
             const pdfBase64 = doc.output('datauristring').split(',')[1];
 
             // Save to backend
+            const token = await firebaseUser?.getIdToken();
             const res = await fetch('/api/consent/save', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     clientId,
                     clientName,

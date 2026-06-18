@@ -46,7 +46,7 @@ const staggerContainer = {
 
 export default function TherapistSchedulePage() {
     const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
+    const { user, firebaseUser, loading: authLoading } = useAuth();
 
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -160,17 +160,27 @@ export default function TherapistSchedulePage() {
     };
 
     const handleCancelSession = async (bookingId: string) => {
-        if (!confirm('Are you sure you want to cancel this session? This action cannot be undone.')) return;
+        if (!confirm('Are you sure you want to cancel this session? Any applicable refunds will be processed automatically.')) return;
 
         setProcessingId(bookingId);
         try {
-            const bookingRef = doc(db, 'bookings', bookingId);
-            await updateDoc(bookingRef, {
-                status: 'cancelled'
+            const token = await firebaseUser?.getIdToken();
+            const res = await fetch('/api/payment/cancel-booking', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ bookingId })
             });
-        } catch (error) {
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to cancel booking');
+
+            alert(data.message || 'Session cancelled successfully.');
+        } catch (error: any) {
             console.error('Error cancelling booking:', error);
-            alert('Failed to cancel session.');
+            alert('Cancellation Failed: ' + error.message);
         } finally {
             setProcessingId(null);
         }

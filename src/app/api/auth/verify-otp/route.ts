@@ -30,7 +30,16 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'OTP has expired' }, { status: 400 });
         }
 
+        // Brute-force guard: a 6-digit code is guessable if attempts are
+        // unlimited. Lock the code after 5 wrong tries.
+        const attempts = data.attempts || 0;
+        if (attempts >= 5) {
+            await docRef.delete();
+            return NextResponse.json({ error: 'Too many incorrect attempts. Please request a new code.' }, { status: 429 });
+        }
+
         if (data.otp !== otp) {
+            await docRef.update({ attempts: attempts + 1 });
             return NextResponse.json({ error: 'Invalid OTP' }, { status: 400 });
         }
 

@@ -19,13 +19,30 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
         }
 
+        const adminDb = getAdminDb();
+        const docRef = adminDb.collection('otp_verifications').doc(email);
+
+        // Throttle resends to curb OTP spam / email bombing.
+        const existing = await docRef.get();
+        if (existing.exists) {
+            const prev = existing.data()!;
+            const prevCreatedAt = prev.createdAt?.toDate ? prev.createdAt.toDate() : new Date(prev.createdAt);
+            const secondsSinceLast = (Date.now() - prevCreatedAt.getTime()) / 1000;
+            if (secondsSinceLast < 60) {
+                return NextResponse.json(
+                    { error: 'Please wait a moment before requesting another code.' },
+                    { status: 429 }
+                );
+            }
+        }
+
         // Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Store in Firestore
-        const adminDb = getAdminDb();
-        await adminDb.collection('otp_verifications').doc(email).set({
+        // Store in Firestore (attempts counter backs the verify-otp lockout)
+        await docRef.set({
             otp,
+            attempts: 0,
             createdAt: new Date(),
             expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes from now
         });
