@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
+import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -28,8 +29,9 @@ function SignupForm() {
     const [step, setStep] = useState(1); // 1: Details, 2: OTP
     const [otp, setOtp] = useState('');
     const [otpSent, setOtpSent] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
 
-    const { signup } = useAuth();
+    const { signup, signInWithGoogle } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectTo = searchParams.get('redirect') || '/';
@@ -108,6 +110,28 @@ function SignupForm() {
             }
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleGoogleSignUp = async () => {
+        setError('');
+        setGoogleLoading(true);
+        try {
+            const role = await signInWithGoogle();
+            let destination = redirectTo;
+            if (role === 'admin') {
+                destination = '/admin/dashboard';
+            } else if (role === 'therapist') {
+                destination = '/therapist/dashboard';
+            }
+            window.location.href = destination;
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : '';
+            // A user dismissing the Google popup is not an error worth showing.
+            if (!msg.includes('popup-closed-by-user') && !msg.includes('cancelled-popup-request') && !msg.includes('popup-blocked')) {
+                setError('Unable to sign up with Google. Please try again.');
+            }
+            setGoogleLoading(false);
         }
     };
 
@@ -291,6 +315,23 @@ function SignupForm() {
                             Back
                         </button>
                     </form>
+                )}
+
+                {step === 1 && (
+                    <>
+                        <div className="my-6 flex items-center gap-3">
+                            <div className="h-px flex-1 bg-[var(--neutral-200)]" />
+                            <span className="text-xs text-[var(--neutral-400)] uppercase tracking-wide">or</span>
+                            <div className="h-px flex-1 bg-[var(--neutral-200)]" />
+                        </div>
+
+                        <GoogleSignInButton
+                            onClick={handleGoogleSignUp}
+                            disabled={isLoading || googleLoading}
+                            loading={googleLoading}
+                            label="Sign up with Google"
+                        />
+                    </>
                 )}
 
                 <div className="mt-6 text-center">

@@ -7,6 +7,8 @@ import {
     createUserWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
+    GoogleAuthProvider,
+    signInWithPopup,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, deleteDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -20,6 +22,7 @@ interface AuthContextType {
     error: string | null;
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string, name: string) => Promise<void>;
+    signInWithGoogle: () => Promise<UserRole>;
     logout: () => Promise<void>;
     clearError: () => void;
 }
@@ -175,6 +178,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const signInWithGoogle = async (): Promise<UserRole> => {
+        if (!auth || !db) {
+            throw new Error('Authentication not available');
+        }
+        setError(null);
+        setLoading(true);
+        try {
+            const provider = new GoogleAuthProvider();
+            const userCredential = await signInWithPopup(auth, provider);
+            const firebaseUser = userCredential.user;
+
+            // Ensure a Firestore profile exists. New Google users won't have one,
+            // and the `users` collection only allows server-side creation, so we
+            // create it through the same secure endpoint the email/password flow uses.
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            let userSnap = await getDoc(userRef);
+
+            if (!userSnap.exists()) {
+                const idToken = await firebaseUser.getIdToken();
+                const response = await fetch('/api/auth/register-profile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`,
+                    },
+                    body: JSON.stringify({
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        name: firebaseUser.displayName || '',
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to create your profile');
+                }
+
+                userSnap = await getDoc(userRef);
+            }
+
+            return (userSnap.data()?.role as UserRole) || 'client';
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to sign in with Google';
+            setError(errorMessage);
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const logout = async () => {
         if (!auth) {
             return;
@@ -201,6 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 error,
                 login,
                 signup,
+                signInWithGoogle,
                 logout,
                 clearError,
             }}

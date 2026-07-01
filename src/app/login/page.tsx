@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -22,8 +23,10 @@ function LoginForm() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const { signInWithGoogle } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectTo = searchParams.get('redirect');
@@ -72,6 +75,30 @@ function LoginForm() {
                 setError('An unexpected error occurred.');
             }
             setIsLoading(false);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        setError('');
+        setGoogleLoading(true);
+        try {
+            const role = await signInWithGoogle();
+            let destination = '/';
+            if (redirectTo) {
+                destination = redirectTo;
+            } else if (role === 'admin') {
+                destination = '/admin/dashboard';
+            } else if (role === 'therapist') {
+                destination = '/therapist/dashboard';
+            }
+            window.location.href = destination;
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : '';
+            // A user dismissing the Google popup is not an error worth showing.
+            if (!msg.includes('popup-closed-by-user') && !msg.includes('cancelled-popup-request') && !msg.includes('popup-blocked')) {
+                setError('Unable to sign in with Google. Please try again.');
+            }
+            setGoogleLoading(false);
         }
     };
 
@@ -154,7 +181,7 @@ function LoginForm() {
 
                     <button
                         type="submit"
-                        disabled={isLoading}
+                        disabled={isLoading || googleLoading}
                         className="btn btn-primary w-full py-3 flex items-center justify-center font-semibold"
                     >
                         {isLoading ? (
@@ -167,6 +194,19 @@ function LoginForm() {
                         )}
                     </button>
                 </form>
+
+                <div className="my-6 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-[var(--neutral-200)]" />
+                    <span className="text-xs text-[var(--neutral-400)] uppercase tracking-wide">or</span>
+                    <div className="h-px flex-1 bg-[var(--neutral-200)]" />
+                </div>
+
+                <GoogleSignInButton
+                    onClick={handleGoogleSignIn}
+                    disabled={isLoading || googleLoading}
+                    loading={googleLoading}
+                    label="Sign in with Google"
+                />
 
                 <div className="mt-8 text-center">
                     <p className="text-[var(--neutral-500)] text-sm">

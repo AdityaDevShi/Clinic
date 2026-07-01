@@ -6,11 +6,6 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ["firebase-admin"],
-  /*
-  eslint: {
-    ignoreDuringBuilds: true,
-  }
-  */
 };
 
 export default nextConfig;
