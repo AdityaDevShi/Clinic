@@ -5,7 +5,9 @@ import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Heading, Body, Muted } from '@/components/ui/Typography';
+import { GoogleButton } from '@/components/GoogleButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { GoogleSignInCancelled } from '@/lib/googleAuth';
 import { colors, radius, spacing } from '@/constants/theme';
 
 function friendlyAuthError(message: string): string {
@@ -23,7 +25,8 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const { login } = useAuth();
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const { login, signInWithGoogle } = useAuth();
 
     const handleLogin = async () => {
         if (!email.trim() || !password) {
@@ -38,6 +41,20 @@ export default function Login() {
         } catch (err: unknown) {
             setError(friendlyAuthError(err instanceof Error ? err.message : ''));
             setSubmitting(false);
+        }
+    };
+
+    const handleGoogle = async () => {
+        setError('');
+        setGoogleLoading(true);
+        try {
+            await signInWithGoogle();
+            router.replace('/');
+        } catch (err: unknown) {
+            if (!(err instanceof GoogleSignInCancelled)) {
+                setError('Unable to sign in with Google. Please try again.');
+            }
+            setGoogleLoading(false);
         }
     };
 
@@ -78,7 +95,15 @@ export default function Login() {
                 <Muted style={styles.forgotText}>Forgot password?</Muted>
             </Link>
 
-            <Button title="Sign In" onPress={handleLogin} loading={submitting} />
+            <Button title="Sign In" onPress={handleLogin} loading={submitting} disabled={googleLoading} />
+
+            <View style={styles.divider}>
+                <View style={styles.line} />
+                <Muted style={styles.dividerText}>OR</Muted>
+                <View style={styles.line} />
+            </View>
+
+            <GoogleButton label="Sign in with Google" onPress={handleGoogle} loading={googleLoading} disabled={submitting} />
 
             <View style={styles.footer}>
                 <Muted>
@@ -107,6 +132,9 @@ const styles = StyleSheet.create({
     errorText: { color: colors.error, fontSize: 14 },
     forgot: { alignSelf: 'flex-end', marginBottom: spacing.xl },
     forgotText: { color: colors.primary600, fontWeight: '500' },
+    divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.lg },
+    line: { flex: 1, height: 1, backgroundColor: colors.neutral200 },
+    dividerText: { color: colors.neutral400 },
     footer: { alignItems: 'center', marginTop: spacing.xl },
     link: { color: colors.primary600, fontWeight: '600' },
 });

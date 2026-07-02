@@ -9,6 +9,7 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { api } from '@/lib/api';
+import { signInWithGoogleCredential, signOutGoogle } from '@/lib/googleAuth';
 import { User, UserRole } from '@/lib/types';
 
 interface AuthContextType {
@@ -18,6 +19,7 @@ interface AuthContextType {
     error: string | null;
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string, name: string) => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
     clearError: () => void;
 }
@@ -78,8 +80,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(await fetchUserProfile(cred.user));
     };
 
+    const signInWithGoogle = async () => {
+        setError(null);
+        const cred = await signInWithGoogleCredential();
+        // New Google users won't have a Firestore profile yet — create it via
+        // the same secure endpoint the email/password flow uses.
+        const existing = await getDoc(doc(db, 'users', cred.user.uid));
+        if (!existing.exists()) {
+            await api.registerProfile({
+                uid: cred.user.uid,
+                email: cred.user.email,
+                name: cred.user.displayName || '',
+            });
+        }
+        setUser(await fetchUserProfile(cred.user));
+    };
+
     const logout = async () => {
         setError(null);
+        await signOutGoogle();
         await signOut(auth);
         setUser(null);
     };
@@ -88,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <AuthContext.Provider
-            value={{ user, firebaseUser, loading, error, login, signup, logout, clearError }}
+            value={{ user, firebaseUser, loading, error, login, signup, signInWithGoogle, logout, clearError }}
         >
             {children}
         </AuthContext.Provider>

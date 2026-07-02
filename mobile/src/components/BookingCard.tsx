@@ -36,6 +36,8 @@ export function BookingCard({
     const isUpcoming = booking.sessionTime > new Date() &&
         (booking.status === 'confirmed' || booking.status === 'pending');
     const joinUrl = meetLink || booking.meetLink;
+    const hasActions =
+        (isUpcoming && (joinUrl || onMarkDone || onReschedule || onCancel)) || !!onRate;
 
     return (
         <View style={styles.card}>
@@ -53,7 +55,7 @@ export function BookingCard({
                 <Text style={styles.metaText}>{format(booking.sessionTime, 'h:mm a')}</Text>
             </View>
 
-            {isUpcoming || onRate ? (
+            {hasActions ? (
                 <View style={styles.actions}>
                     {isUpcoming && joinUrl ? (
                         <Pressable style={[styles.action, styles.actionPrimary]} onPress={() => Linking.openURL(joinUrl)}>

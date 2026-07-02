@@ -5,7 +5,9 @@ import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Heading, Body, Muted } from '@/components/ui/Typography';
+import { GoogleButton } from '@/components/GoogleButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { GoogleSignInCancelled } from '@/lib/googleAuth';
 import { api } from '@/lib/api';
 import { colors, radius, spacing } from '@/constants/theme';
 
@@ -27,7 +29,22 @@ export default function Register() {
     const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const { signup } = useAuth();
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const { signup, signInWithGoogle } = useAuth();
+
+    const handleGoogle = async () => {
+        setError('');
+        setGoogleLoading(true);
+        try {
+            await signInWithGoogle();
+            router.replace('/');
+        } catch (err: unknown) {
+            if (!(err instanceof GoogleSignInCancelled)) {
+                setError('Unable to sign up with Google. Please try again.');
+            }
+            setGoogleLoading(false);
+        }
+    };
 
     const passwordProblems = (): string | null => {
         if (password.length < 8) return 'Password must be at least 8 characters.';
@@ -123,7 +140,15 @@ export default function Register() {
                         secureTextEntry
                         editable={!submitting}
                     />
-                    <Button title="Continue" onPress={handleSendOtp} loading={submitting} />
+                    <Button title="Continue" onPress={handleSendOtp} loading={submitting} disabled={googleLoading} />
+
+                    <View style={styles.divider}>
+                        <View style={styles.line} />
+                        <Muted style={styles.dividerText}>OR</Muted>
+                        <View style={styles.line} />
+                    </View>
+
+                    <GoogleButton label="Sign up with Google" onPress={handleGoogle} loading={googleLoading} disabled={submitting} />
                 </>
             ) : (
                 <>
@@ -171,6 +196,9 @@ const styles = StyleSheet.create({
     },
     errorText: { color: colors.error, fontSize: 14 },
     otpInput: { textAlign: 'center', fontSize: 24, letterSpacing: 8 },
+    divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.lg },
+    line: { flex: 1, height: 1, backgroundColor: colors.neutral200 },
+    dividerText: { color: colors.neutral400 },
     footer: { alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
     link: { color: colors.primary600, fontWeight: '600' },
     terms: { textAlign: 'center', paddingHorizontal: spacing.lg },

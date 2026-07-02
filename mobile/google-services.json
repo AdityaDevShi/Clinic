@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "650321118343",
+    "firebase_url": "https://clinic-f7125-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "clinic-f7125",
+    "storage_bucket": "clinic-f7125.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:650321118343:android:3459c6e8513cff04a82422",
+        "android_client_info": {
+          "package_name": "com.arambh.clinic"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "650321118343-5c0qhsif9ntnn2282c3iudmf58t91inb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8FPIkTsMeEJW9AkT7alWn0zmS5nd9Tgk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "650321118343-5c0qhsif9ntnn2282c3iudmf58t91inb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
