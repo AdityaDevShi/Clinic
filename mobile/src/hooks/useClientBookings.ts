@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BookingService } from '@/services/bookingService';
 import { Booking } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { syncBookingReminders } from '@/lib/notifications';
 
 /** Live bookings for the signed-in client, newest session first. */
 export function useClientBookings() {
@@ -15,6 +16,8 @@ export function useClientBookings() {
             list.sort((a, b) => b.sessionTime.getTime() - a.sessionTime.getTime());
             setBookings(list);
             setLoading(false);
+            // Keep local session reminders in sync with the latest bookings.
+            syncBookingReminders(list);
         });
         return () => unsubscribe();
     }, [user]);

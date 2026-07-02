@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb, verifyRequestUid } from '@/lib/firebase/admin';
+import { sendPushToUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -142,6 +143,19 @@ export async function POST(req: Request) {
             rescheduledAt: new Date(),
             updatedAt: new Date()
         });
+
+        // Notify the other party of the new time (best-effort).
+        const notifyUid = role === 'client' ? bookingData?.therapistId : bookingData?.clientId;
+        if (notifyUid) {
+            const when = newDate.toLocaleString('en-IN', {
+                weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+            });
+            sendPushToUser(notifyUid, {
+                title: 'Session rescheduled',
+                body: `A session was moved to ${when}.`,
+                data: { bookingId },
+            }).catch(() => {});
+        }
 
         return NextResponse.json({
             success: true,

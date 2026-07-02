@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { sendPushToUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +94,25 @@ export async function POST(req: Request) {
         await batch.commit();
 
         console.log(`Payment verified & ${bookingIds.length} booking(s) confirmed. PaymentID: ${razorpay_payment_id}`);
+
+        // Notify client + therapist (best-effort; from order notes set server-side).
+        const clientUid = orderNotes.uId;
+        const therapistUid = orderNotes.therapistId;
+        const sessionWord = bookingIds.length > 1 ? `${bookingIds.length} sessions are` : 'Your session is';
+        if (clientUid) {
+            sendPushToUser(clientUid, {
+                title: 'Booking confirmed',
+                body: `${sessionWord} booked. See you soon!`,
+                data: { bookingId: bookingIds[0] },
+            }).catch(() => {});
+        }
+        if (therapistUid) {
+            sendPushToUser(therapistUid, {
+                title: 'New booking',
+                body: `You have ${bookingIds.length > 1 ? `${bookingIds.length} new sessions` : 'a new confirmed session'}.`,
+                data: { bookingId: bookingIds[0] },
+            }).catch(() => {});
+        }
 
         return NextResponse.json({
             success: true,

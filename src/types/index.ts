@@ -9,6 +9,7 @@ export interface User {
     role: UserRole;
     createdAt: Date;
     photoUrl?: string;
+    expoPushTokens?: string[]; // registered mobile devices for push
 }
 
 // Therapist extends user with additional info

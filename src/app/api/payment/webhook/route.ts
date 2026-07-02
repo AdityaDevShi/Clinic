@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { sendPushToUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,6 +127,16 @@ export async function POST(req: Request) {
                     });
                     await batch.commit();
                     console.log(`Refund confirmed for ${bookingsSnapshot.size} booking(s).`);
+
+                    // Notify the client their refund went through (best-effort).
+                    const clientUid = bookingsSnapshot.docs[0].data()?.clientId;
+                    if (clientUid) {
+                        sendPushToUser(clientUid, {
+                            title: 'Refund processed',
+                            body: `Your refund of ₹${refundAmount} has been processed.`,
+                            data: { paymentId },
+                        }).catch(() => {});
+                    }
                 } else {
                     console.warn(`Refund webhook: No booking found for paymentId ${paymentId}`);
                 }

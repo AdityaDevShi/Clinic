@@ -10,6 +10,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { api } from '@/lib/api';
 import { signInWithGoogleCredential, signOutGoogle } from '@/lib/googleAuth';
+import { registerPushToken, unregisterPushToken } from '@/lib/notifications';
 import { User, UserRole } from '@/lib/types';
 
 interface AuthContextType {
@@ -51,7 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setFirebaseUser(fbUser);
             if (fbUser) {
                 try {
-                    setUser(await fetchUserProfile(fbUser));
+                    const profile = await fetchUserProfile(fbUser);
+                    setUser(profile);
+                    // Register this device for push (fire-and-forget).
+                    if (profile) registerPushToken(profile.id);
                 } catch (err) {
                     console.error('Error fetching user profile:', err);
                     setUser(null);
@@ -98,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const logout = async () => {
         setError(null);
+        if (firebaseUser) await unregisterPushToken(firebaseUser.uid);
         await signOutGoogle();
         await signOut(auth);
         setUser(null);

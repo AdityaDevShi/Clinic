@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 import { getAdminDb, verifyRequestUid } from '@/lib/firebase/admin';
+import { sendPushToUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,6 +111,17 @@ export async function POST(req: Request) {
             isLateCancel: isLateCancel,
             updatedAt: new Date()
         });
+
+        // Notify the other party (best-effort).
+        const notifyUid = role === 'client' ? bookingData?.therapistId : bookingData?.clientId;
+        const whoCancelled = role === 'client' ? bookingData?.clientName || 'A client' : 'The therapist';
+        if (notifyUid) {
+            sendPushToUser(notifyUid, {
+                title: 'Session cancelled',
+                body: `${whoCancelled} cancelled a session.`,
+                data: { bookingId },
+            }).catch(() => {});
+        }
 
         return NextResponse.json({
             success: true,
