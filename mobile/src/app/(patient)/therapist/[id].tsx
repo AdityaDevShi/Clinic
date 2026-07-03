@@ -93,15 +93,17 @@ export default function TherapistDetail() {
 
                 <View style={styles.content}>
                     <View style={styles.priceCard}>
-                        <View>
-                            <Muted>Session fee</Muted>
-                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                                {original ? <Text style={styles.strike}>₹{original}</Text> : null}
-                                <Text style={styles.price}>₹{price}</Text>
-                                <Muted>/ {therapist.sessionDuration || '50-60 minutes'}</Muted>
-                            </View>
+                        <Muted>Session fee</Muted>
+                        <View style={styles.priceRow}>
+                            {original ? <Text style={styles.strike}>₹{original}</Text> : null}
+                            <Text style={styles.price}>₹{price}</Text>
+                            <Muted>/ {therapist.sessionDuration || '50-60 minutes'}</Muted>
                         </View>
-                        <Button title="Book Session" onPress={() => router.push(`/(patient)/book/${therapist.id}`)} />
+                        <Button
+                            title="Book Session"
+                            onPress={() => router.push(`/(patient)/book/${therapist.id}`)}
+                            style={styles.bookButton}
+                        />
                     </View>
 
                     {therapist.bio || therapist.about ? (
@@ -171,18 +173,23 @@ const styles = StyleSheet.create({
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
     content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
     priceCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         backgroundColor: colors.white,
         borderRadius: radius.lg,
-        padding: spacing.lg,
+        padding: spacing.xl,
         borderWidth: 1,
         borderColor: colors.neutral200,
         marginBottom: spacing.xl,
     },
-    strike: { fontSize: 14, color: colors.neutral400, textDecorationLine: 'line-through' },
-    price: { fontSize: 24, fontWeight: '700', color: colors.primary600 },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 8,
+        marginTop: spacing.xs,
+        flexWrap: 'wrap',
+    },
+    bookButton: { marginTop: spacing.lg },
+    strike: { fontSize: 15, color: colors.neutral400, textDecorationLine: 'line-through' },
+    price: { fontSize: 28, fontWeight: '700', color: colors.primary600 },
     section: { marginBottom: spacing.xl },
     sectionTitle: { marginBottom: spacing.sm },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

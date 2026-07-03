@@ -5,7 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '@/lib/firebase';
-import { htmlToPlainText, youtubeVideoId } from '@/lib/format';
+import { htmlToPlainText, youtubeVideoId, fetchYoutubeMeta, VideoMeta } from '@/lib/format';
 import { BlogPost } from '@/lib/types';
 import { Screen } from '@/components/ui/Screen';
 import { Heading, Body, Muted } from '@/components/ui/Typography';
@@ -73,28 +73,55 @@ export default function BlogPostScreen() {
 }
 
 /**
- * Tappable video card: YouTube gets a real thumbnail + play overlay; other
- * providers get a generic watch card. Opens in the YouTube app / browser.
+ * Discord-style embed card: provider label + author + title header, then the
+ * real video thumbnail with a play overlay. Metadata comes from YouTube's
+ * oEmbed endpoint so it works for any YouTube URL form; degrades gracefully
+ * to a plain thumbnail card if the fetch fails. Tap opens the video.
  */
 function VideoCard({ url, width }: { url: string; width: number }) {
+    const [meta, setMeta] = useState<VideoMeta | null>(null);
     const ytId = youtubeVideoId(url);
-    const height = width * 0.5625; // 16:9
+    const thumbWidth = width - 2; // inside the card border
+    const thumbHeight = thumbWidth * 0.5625; // 16:9
+    const thumbnail = meta?.thumbnail || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchYoutubeMeta(url).then((m) => {
+            if (!cancelled && m) setMeta(m);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [url]);
 
     return (
-        <Pressable style={[styles.videoCard, { width, height }]} onPress={() => Linking.openURL(url)}>
-            {ytId ? (
-                <Image
-                    source={{ uri: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` }}
-                    style={{ width, height, borderRadius: radius.lg }}
-                />
-            ) : (
-                <View style={[styles.videoFallback, { width, height }]} />
-            )}
-            <View style={styles.playOverlay}>
-                <View style={styles.playButton}>
-                    <Ionicons name="play" size={28} color={colors.white} />
+        <Pressable
+            style={({ pressed }) => [styles.embedCard, { width }, pressed && { opacity: 0.92 }]}
+            onPress={() => Linking.openURL(url)}
+        >
+            <View style={styles.embedHeader}>
+                <View style={styles.embedProviderRow}>
+                    <Ionicons name="logo-youtube" size={14} color="#FF0000" />
+                    <Text style={styles.embedProvider}>YouTube</Text>
+                    {meta?.author ? <Text style={styles.embedAuthor} numberOfLines={1}> · {meta.author}</Text> : null}
                 </View>
-                <Text style={styles.playLabel}>Watch video</Text>
+                <Text style={styles.embedTitle} numberOfLines={2}>
+                    {meta?.title || 'Watch on YouTube'}
+                </Text>
+            </View>
+
+            <View>
+                {thumbnail ? (
+                    <Image source={{ uri: thumbnail }} style={{ width: thumbWidth, height: thumbHeight }} />
+                ) : (
+                    <View style={[styles.videoFallback, { width: thumbWidth, height: thumbHeight }]} />
+                )}
+                <View style={styles.playOverlay}>
+                    <View style={styles.playButton}>
+                        <Ionicons name="play" size={26} color={colors.white} />
+                    </View>
+                </View>
             </View>
         </Pressable>
     );
@@ -103,8 +130,22 @@ function VideoCard({ url, width }: { url: string; width: number }) {
 const styles = StyleSheet.create({
     content: { padding: spacing.lg, paddingBottom: spacing.xxl },
     body: { fontSize: 16, lineHeight: 26 },
-    videoCard: { marginBottom: spacing.xl, borderRadius: radius.lg, overflow: 'hidden' },
-    videoFallback: { backgroundColor: colors.neutral800, borderRadius: radius.lg },
+    embedCard: {
+        marginBottom: spacing.xl,
+        borderRadius: radius.lg,
+        overflow: 'hidden',
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: colors.neutral200,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FF0000',
+    },
+    embedHeader: { padding: spacing.md, gap: 4 },
+    embedProviderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    embedProvider: { fontSize: 12, color: colors.neutral500, fontWeight: '600' },
+    embedAuthor: { fontSize: 12, color: colors.neutral500, flexShrink: 1 },
+    embedTitle: { fontSize: 15, fontWeight: '700', color: colors.primary700, lineHeight: 20 },
+    videoFallback: { backgroundColor: colors.neutral800 },
     playOverlay: {
         position: 'absolute',
         top: 0,
@@ -113,17 +154,15 @@ const styles = StyleSheet.create({
         bottom: 0,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.25)',
-        gap: spacing.sm,
+        backgroundColor: 'rgba(0,0,0,0.2)',
     },
     playButton: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: 'rgba(220,38,38,0.9)',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(220,38,38,0.92)',
         alignItems: 'center',
         justifyContent: 'center',
         paddingLeft: 4,
     },
-    playLabel: { color: colors.white, fontWeight: '600', fontSize: 14 },
 });

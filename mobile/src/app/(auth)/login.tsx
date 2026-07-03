@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
@@ -60,18 +60,24 @@ export default function Login() {
 
     return (
         <Screen style={styles.container}>
+            {/* Soft sage blobs — subtle, brand-toned backdrop */}
+            <View style={styles.blobTopRight} pointerEvents="none" />
+            <View style={styles.blobBottomLeft} pointerEvents="none" />
+
             <View style={styles.header}>
+                <Image source={require('../../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
                 <Heading style={styles.title}>Welcome Back</Heading>
-                <Body>Sign in to continue your journey</Body>
+                <Body style={styles.subtitle}>Sign in to continue your journey</Body>
             </View>
 
-            {error ? (
-                <View style={styles.errorBox}>
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            ) : null}
+            <View style={styles.card}>
+                {error ? (
+                    <View style={styles.errorBox}>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                ) : null}
 
-            <Input
+                <Input
                 label="Email Address"
                 value={email}
                 onChangeText={setEmail}
@@ -103,7 +109,8 @@ export default function Login() {
                 <View style={styles.line} />
             </View>
 
-            <GoogleButton label="Sign in with Google" onPress={handleGoogle} loading={googleLoading} disabled={submitting} />
+                <GoogleButton label="Sign in with Google" onPress={handleGoogle} loading={googleLoading} disabled={submitting} />
+            </View>
 
             <View style={styles.footer}>
                 <Muted>
@@ -118,9 +125,43 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-    container: { paddingTop: 80 },
-    header: { alignItems: 'center', marginBottom: spacing.xxl },
-    title: { marginBottom: spacing.sm },
+    container: { paddingTop: 48 },
+    blobTopRight: {
+        position: 'absolute',
+        top: -90,
+        right: -90,
+        width: 260,
+        height: 260,
+        borderRadius: 130,
+        backgroundColor: colors.primary100,
+        opacity: 0.7,
+    },
+    blobBottomLeft: {
+        position: 'absolute',
+        bottom: -110,
+        left: -110,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        backgroundColor: colors.warm200,
+        opacity: 0.8,
+    },
+    header: { alignItems: 'center', marginBottom: spacing.xl },
+    logo: { width: 72, height: 96, marginBottom: spacing.md },
+    title: { marginBottom: spacing.xs, textAlign: 'center' },
+    subtitle: { textAlign: 'center' },
+    card: {
+        backgroundColor: colors.white,
+        borderRadius: radius.xl,
+        padding: spacing.xl,
+        borderWidth: 1,
+        borderColor: colors.neutral200,
+        shadowColor: colors.primary900,
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 3,
+    },
     errorBox: {
         backgroundColor: colors.errorBg,
         borderWidth: 1,
