@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "650321118343-o2c5ataj9p9c0onr4qad4tv6paraptrp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.arambh.clinic",
+            "certificate_hash": "d7cf75aeb6947dbc1be53e987f0cc42887dff595"
+          }
+        },
+        {
           "client_id": "650321118343-5c0qhsif9ntnn2282c3iudmf58t91inb.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -30,6 +38,13 @@
             {
               "client_id": "650321118343-5c0qhsif9ntnn2282c3iudmf58t91inb.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "650321118343-taf3mkp7rtp5cs8gs3asec3rpnkd67pr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.arambh.clinic"
+              }
             }
           ]
         }

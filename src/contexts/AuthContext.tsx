@@ -61,6 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         const userData = userDoc.data();
                         let role = userData.role as UserRole;
 
+                        // Backfill: persist the provider photo (e.g. Google) into the
+                        // user doc so it's stored in the DB, not just rendered client-side.
+                        if (!userData.photoUrl && firebaseUser.photoURL) {
+                            userData.photoUrl = firebaseUser.photoURL;
+                            setDoc(doc(db, 'users', firebaseUser.uid), { photoUrl: firebaseUser.photoURL }, { merge: true })
+                                .catch((e) => console.warn('photoUrl backfill failed:', e));
+                        }
+
                         // Self-healing: Ensure care@arambh.net is always admin
                         if (firebaseUser.email === 'care@arambh.net' && role !== 'admin') {
                             console.log('Auto-promoting care@arambh.net to admin...');

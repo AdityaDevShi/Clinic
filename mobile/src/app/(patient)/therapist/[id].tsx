@@ -4,6 +4,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { db } from '@/lib/firebase';
+import { htmlToPlainText } from '@/lib/format';
 import { Therapist, Feedback } from '@/lib/types';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
@@ -106,7 +107,7 @@ export default function TherapistDetail() {
                     {therapist.bio || therapist.about ? (
                         <View style={styles.section}>
                             <Subheading style={styles.sectionTitle}>About</Subheading>
-                            <Body>{therapist.about || therapist.bio}</Body>
+                            <Body>{htmlToPlainText(therapist.about || therapist.bio || '')}</Body>
                         </View>
                     ) : null}
 

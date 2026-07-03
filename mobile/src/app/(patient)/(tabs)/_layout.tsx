@@ -15,6 +15,13 @@ export default function PatientTabs() {
             <Tabs.Screen
                 name="index"
                 options={{
+                    title: 'Home',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="therapists"
+                options={{
                     title: 'Therapists',
                     tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} />,
                 }}

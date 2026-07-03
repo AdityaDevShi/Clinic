@@ -49,12 +49,15 @@ export async function POST(req: Request) {
             }
         }
 
-        // 3. Create user document securely
+        // 3. Create user document securely.
+        // Persist the auth provider's profile photo (e.g. Google) server-side
+        // so both the website and the mobile app render it from the DB.
         const adminDb = getAdminDb();
         await adminDb.collection('users').doc(uid).set({
             email,
             name,
             role,
+            photoUrl: userRecord.photoURL || null,
             createdAt: new Date(),
         });
 

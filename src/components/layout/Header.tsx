@@ -87,9 +87,19 @@ export default function Header() {
                                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                         className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-[var(--warm-100)] transition-colors"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-[var(--primary-100)] flex items-center justify-center">
-                                            <User className="w-4 h-4 text-[var(--primary-600)]" />
-                                        </div>
+                                        {user.photoUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={user.photoUrl}
+                                                alt={user.name || 'Profile'}
+                                                referrerPolicy="no-referrer"
+                                                className="w-8 h-8 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-8 h-8 rounded-full bg-[var(--primary-100)] flex items-center justify-center">
+                                                <User className="w-4 h-4 text-[var(--primary-600)]" />
+                                            </div>
+                                        )}
                                         <span className="text-sm font-medium text-[var(--neutral-700)]">
                                             {user.name || 'User'}
                                         </span>

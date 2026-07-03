@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { BlogService } from '@/services/blogService';
+import { htmlToPlainText } from '@/lib/format';
 import { BlogPost } from '@/lib/types';
 import { Heading, Subheading, Body, Muted } from '@/components/ui/Typography';
 import { colors, radius, spacing } from '@/constants/theme';
@@ -51,9 +52,9 @@ export default function BlogTab() {
                         ) : null}
                         <View style={styles.cardBody}>
                             <Subheading numberOfLines={2}>{item.title}</Subheading>
-                            {item.excerpt ? (
+                            {item.excerpt || item.content ? (
                                 <Body numberOfLines={2} style={{ marginTop: spacing.xs }}>
-                                    {item.excerpt}
+                                    {htmlToPlainText(item.excerpt || item.content || '').slice(0, 160)}
                                 </Body>
                             ) : null}
                             <Muted style={{ marginTop: spacing.sm }}>

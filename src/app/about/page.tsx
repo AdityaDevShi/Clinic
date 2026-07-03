@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import { Award, Heart, Shield, Users, BookOpen, Target } from 'lucide-react';
 
@@ -54,6 +56,22 @@ const values = [
 ];
 
 export default function AboutPage() {
+    // Lead therapist photo comes from her live therapist profile in Firestore —
+    // she manages it herself; the About page always shows the current one.
+    const [leadPhoto, setLeadPhoto] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!db) return;
+        getDocs(query(collection(db, 'therapists'), where('isEnabled', '==', true)))
+            .then((snap) => {
+                const lead = snap.docs
+                    .map((d) => d.data())
+                    .find((t) => (t.name || '').toLowerCase().includes('shiwani'));
+                if (lead?.photoUrl) setLeadPhoto(lead.photoUrl as string);
+            })
+            .catch(() => { /* keep initials fallback */ });
+    }, []);
+
     return (
         <div className="min-h-screen">
 
@@ -195,9 +213,18 @@ export default function AboutPage() {
                             variants={fadeInUp}
                             className="bg-[var(--warm-50)] rounded-2xl p-8 md:p-12"
                         >
-                            <div className="w-32 h-32 mx-auto mb-6 bg-[var(--primary-100)] rounded-full flex items-center justify-center">
-                                <span className="text-4xl font-serif text-[var(--primary-600)]">SK</span>
-                            </div>
+                            {leadPhoto ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={leadPhoto}
+                                    alt="Shiwani Kohli"
+                                    className="w-32 h-32 mx-auto mb-6 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-32 h-32 mx-auto mb-6 bg-[var(--primary-100)] rounded-full flex items-center justify-center">
+                                    <span className="text-4xl font-serif text-[var(--primary-600)]">SK</span>
+                                </div>
+                            )}
 
                             <h3 className="font-serif text-2xl text-[var(--primary-700)] mb-2">
                                 Shiwani Kohli
