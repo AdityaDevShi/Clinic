@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
+import TurnstileWidget, { turnstileEnabled } from '@/components/ui/TurnstileWidget';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -29,6 +30,7 @@ function SignupForm() {
     const [step, setStep] = useState(1); // 1: Details, 2: OTP
     const [otp, setOtp] = useState('');
     const [otpSent, setOtpSent] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [googleLoading, setGoogleLoading] = useState(false);
 
     const { signup, signInWithGoogle } = useAuth();
@@ -56,13 +58,18 @@ function SignupForm() {
             return;
         }
 
+        if (turnstileEnabled && !captchaToken) {
+            setError('Please complete the verification below.');
+            return;
+        }
+
         setIsLoading(true);
 
         try {
             const res = await fetch('/api/auth/send-otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify({ email, turnstileToken: captchaToken }),
             });
 
             const data = await res.json();
@@ -253,6 +260,8 @@ function SignupForm() {
                                 disabled={isLoading}
                             />
                         </div>
+
+                        <TurnstileWidget onToken={setCaptchaToken} />
 
                         <button
                             type="submit"

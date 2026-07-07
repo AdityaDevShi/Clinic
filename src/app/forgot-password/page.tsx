@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
+import TurnstileWidget, { turnstileEnabled } from '@/components/ui/TurnstileWidget';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -15,17 +16,24 @@ export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [sent, setSent] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        if (turnstileEnabled && !captchaToken) {
+            setError('Please complete the verification below.');
+            return;
+        }
+
         setIsLoading(true);
 
         try {
             const res = await fetch('/api/auth/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim().toLowerCase() })
+                body: JSON.stringify({ email: email.trim().toLowerCase(), turnstileToken: captchaToken })
             });
 
             const data = await res.json();
@@ -117,6 +125,8 @@ export default function ForgotPasswordPage() {
                                             autoFocus
                                         />
                                     </div>
+
+                                    <TurnstileWidget onToken={setCaptchaToken} />
 
                                     <button
                                         type="submit"

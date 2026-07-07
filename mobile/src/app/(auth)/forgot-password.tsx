@@ -5,6 +5,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Heading, Body } from '@/components/ui/Typography';
+import { TurnstileSheet } from '@/components/TurnstileSheet';
 import { api } from '@/lib/api';
 import { colors, radius, spacing } from '@/constants/theme';
 
@@ -13,16 +14,25 @@ export default function ForgotPassword() {
     const [error, setError] = useState('');
     const [sent, setSent] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [captchaVisible, setCaptchaVisible] = useState(false);
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         if (!email.trim()) {
             setError('Please enter your email address.');
             return;
         }
         setError('');
+        // Human check first; resolves instantly (null) when Turnstile is off.
+        setCaptchaVisible(true);
+    };
+
+    const handleCaptchaResult = async (token: string | null | undefined) => {
+        setCaptchaVisible(false);
+        if (token === undefined) return; // user closed the sheet
+
         setSubmitting(true);
         try {
-            await api.forgotPassword(email.trim());
+            await api.forgotPassword(email.trim(), token);
             setSent(true);
         } catch {
             setError('Failed to send the reset link. Please try again.');
@@ -69,6 +79,8 @@ export default function ForgotPassword() {
                 onPress={() => router.back()}
                 style={{ marginTop: spacing.md }}
             />
+
+            <TurnstileSheet visible={captchaVisible} onResult={handleCaptchaResult} />
         </Screen>
     );
 }

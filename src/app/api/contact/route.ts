@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 // Simple HTML sanitizer to prevent injection in email bodies
 function escapeHtml(str: string): string {
@@ -18,7 +19,13 @@ function escapeHtml(str: string): string {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { name, email, phone, subject, message } = body;
+        const { name, email, phone, subject, message, turnstileToken } = body;
+
+        // Bot check (enforced only when Turnstile keys are configured)
+        const captcha = await verifyTurnstileToken(turnstileToken, req.headers.get('cf-connecting-ip'));
+        if (!captcha.ok) {
+            return NextResponse.json({ error: captcha.error }, { status: 403 });
+        }
 
         // Basic validation
         if (!name || !email || !message || typeof name !== 'string' || typeof email !== 'string' || typeof message !== 'string') {

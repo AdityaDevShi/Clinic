@@ -45,14 +45,14 @@ export const api = {
     registerProfile: (payload: { uid: string; email: string | null; name: string }) =>
         request<{ success: boolean; role: string }>('/api/auth/register-profile', payload),
 
-    sendOtp: (email: string) =>
-        request<{ success: boolean }>('/api/auth/send-otp', { email }, { authenticated: false }),
+    sendOtp: (email: string, turnstileToken?: string | null) =>
+        request<{ success: boolean }>('/api/auth/send-otp', { email, turnstileToken }, { authenticated: false }),
 
     verifyOtp: (email: string, otp: string) =>
         request<{ success: boolean }>('/api/auth/verify-otp', { email, otp }, { authenticated: false }),
 
-    forgotPassword: (email: string) =>
-        request<{ success: boolean; message: string }>('/api/auth/forgot-password', { email }, { authenticated: false }),
+    forgotPassword: (email: string, turnstileToken?: string | null) =>
+        request<{ success: boolean; message: string }>('/api/auth/forgot-password', { email, turnstileToken }, { authenticated: false }),
 
     createOrder: (payload: { therapistId: string; sessionsCount: number; uId: string; bookingIds: string[] }) =>
         request<{ id: string; currency: string; amount: number; displayAmount: number }>(

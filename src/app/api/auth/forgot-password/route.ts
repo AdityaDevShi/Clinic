@@ -5,10 +5,17 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getAdminDb, getAdminAuth } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 export async function POST(req: Request) {
     try {
-        const { email } = await req.json();
+        const { email, turnstileToken } = await req.json();
+
+        // Bot check (enforced only when Turnstile keys are configured)
+        const captcha = await verifyTurnstileToken(turnstileToken, req.headers.get('cf-connecting-ip'));
+        if (!captcha.ok) {
+            return NextResponse.json({ error: captcha.error }, { status: 403 });
+        }
 
         if (!email || typeof email !== 'string') {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });

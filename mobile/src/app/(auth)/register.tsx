@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Heading, Body, Muted } from '@/components/ui/Typography';
 import { GoogleButton } from '@/components/GoogleButton';
+import { TurnstileSheet } from '@/components/TurnstileSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { GoogleSignInCancelled } from '@/lib/googleAuth';
 import { api } from '@/lib/api';
@@ -30,6 +31,7 @@ export default function Register() {
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [captchaVisible, setCaptchaVisible] = useState(false);
     const { signup, signInWithGoogle } = useAuth();
 
     const handleGoogle = async () => {
@@ -54,7 +56,7 @@ export default function Register() {
         return null;
     };
 
-    const handleSendOtp = async () => {
+    const handleContinue = () => {
         if (!name.trim() || !email.trim()) {
             setError('Please fill in all fields.');
             return;
@@ -65,9 +67,17 @@ export default function Register() {
             return;
         }
         setError('');
+        // Human check first; resolves instantly (null) when Turnstile is off.
+        setCaptchaVisible(true);
+    };
+
+    const handleCaptchaResult = async (token: string | null | undefined) => {
+        setCaptchaVisible(false);
+        if (token === undefined) return; // user closed the sheet
+
         setSubmitting(true);
         try {
-            await api.sendOtp(email.trim());
+            await api.sendOtp(email.trim(), token);
             setStep(2);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to send verification code.');
@@ -140,7 +150,7 @@ export default function Register() {
                         secureTextEntry
                         editable={!submitting}
                     />
-                    <Button title="Continue" onPress={handleSendOtp} loading={submitting} disabled={googleLoading} />
+                    <Button title="Continue" onPress={handleContinue} loading={submitting} disabled={googleLoading} />
 
                     <View style={styles.divider}>
                         <View style={styles.line} />
@@ -178,6 +188,7 @@ export default function Register() {
                     By creating an account, you agree to our Terms of Service and Privacy Policy.
                 </Muted>
             </View>
+            <TurnstileSheet visible={captchaVisible} onResult={handleCaptchaResult} />
         </Screen>
     );
 }

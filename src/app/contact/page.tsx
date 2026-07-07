@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Mail, MapPin, Clock, Send, Loader2, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PhoneDisplay from '@/components/ui/PhoneDisplay';
+import TurnstileWidget, { turnstileEnabled } from '@/components/ui/TurnstileWidget';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -35,6 +36,7 @@ export default function ContactPage() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
     // Auto-fill email when user loads
     useEffect(() => {
@@ -49,6 +51,12 @@ export default function ContactPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (turnstileEnabled && !captchaToken) {
+            alert('Please complete the verification below the form.');
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -57,7 +65,7 @@ export default function ContactPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({ ...formData, turnstileToken: captchaToken }),
             });
 
             const data = await response.json();
@@ -339,6 +347,8 @@ export default function ContactPage() {
                                                 required
                                             />
                                         </div>
+
+                                        <TurnstileWidget onToken={setCaptchaToken} />
 
                                         <button
                                             type="submit"
